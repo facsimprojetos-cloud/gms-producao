@@ -207,3 +207,6 @@ tr.grupo td{background:#f3f4f6;font-weight:800}
 .barra{position:relative;height:22px;background:#e5e7eb;border-radius:11px;overflow:hidden;margin:10px 0 4px}
 .barra>div{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#16a34a,#22c55e)}
 .barra>span{position:relative;display:block;text-align:center;font-size:.78rem;font-weight:800;line-height:22px;color:#111827}
+.lista-cards.largo{grid-template-columns:repeat(auto-fill,minmax(460px,1fr))}
+@media(max-width:700px){.lista-cards.largo{grid-template-columns:1fr}}
+.vol th{background:none;color:#000}

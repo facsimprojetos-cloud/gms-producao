@@ -18,7 +18,7 @@ export async function render(el) {
   el.innerHTML = `
     <div class="cab"><div><h1>Produção interna</h1><p>O que está na produção interna e quanto de cada lote já passou pelo último processo do roteiro (pelo apontador).</p></div></div>
     <div class="filtros"><label class="campo">Buscar<input id="fb" value="${h(busca)}" placeholder="Lote, produto, cor…"></label></div>
-    <div class="lista-cards">${[...grupos.values()].sort((a, b) => String(a[0].desde).localeCompare(String(b[0].desde))).map(itens => {
+    <div class="lista-cards largo">${[...grupos.values()].sort((a, b) => String(b[0].desde).localeCompare(String(a[0].desde))).map(itens => {
       const x0 = itens[0], tot = itens.reduce((a, x) => a + x.qtd_total, 0), feito = itens.reduce((a, x) => a + feitoDe(x), 0);
       const pct = tot ? Math.round(feito / tot * 100) : 0;
       itens.sort((a, b) => a.tamanho_ordem - b.tamanho_ordem || String(a.cor).localeCompare(String(b.cor)));
