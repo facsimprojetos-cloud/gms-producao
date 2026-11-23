@@ -162,7 +162,7 @@ function telaConfirmar(c, depois) {
       <div><h3>Folhas por cor</h3>${c.cores.map(x => `<label class="campo">${h(x.cor)}<input type="number" min="1" step="1" data-cor="${x.posicao}" value="${x.folhas}"></label>`).join('')}</div>
       <div><h3>Riscos por tamanho</h3>${c.tamanhos.map(x => `<label class="campo">${h(x.tamanho)}<input type="number" min="1" step="1" data-tam="${x.posicao}" value="${x.riscos}"></label>`).join('')}</div>
     </div>
-    <div class="tabela-wrap" style="margin-top:12px"><table><thead><tr><th>Tamanho</th><th>Cor</th><th class="n">Peças</th><th class="n">Etiquetas</th></tr></thead><tbody id="prev"></tbody></table></div>`;
+    <div class="tabela-wrap" style="margin-top:12px"><table><thead><tr><th>Tamanho</th><th>Cor</th><th class="n">Peças</th><th class="n">Riscos</th></tr></thead><tbody id="prev"></tbody></table></div>`;
   modal({
     titulo: `Cortar lote ${c.lote} — ${c.produto}`, corpo, largo: true,
     aoAbrir: (m) => {
