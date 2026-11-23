@@ -249,7 +249,7 @@ async function etiquetaVolume(c) {
       if (!imprimir.length) { toast('Informe os volumes de pelo menos um tamanho.', 'erro'); return false; }
       const qr = (txt) => { if (!window.qrcode) return ''; const q = window.qrcode(0, 'M'); q.addData(String(txt)); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
       imprimirHtml(imprimir.flatMap(({ t, n, qtds }) => { const tm = tams.find(x => x.id === t); return Array.from({ length: n }, (_, k) => `<div class="vol"><table>
-        <tr><th class="v-rot">MODELO:</th><td class="v-cod">${h(prod.cod)}</td><td class="v-qr" rowspan="2">${qr(c.lote + tm.nome)}</td></tr>
+        <tr><th class="v-rot"><img class="v-logo" src="img/simbolo-gms-pb.png" alt=""> MODELO:</th><td class="v-cod">${h(prod.cod)}</td><td class="v-qr" rowspan="2">${qr(c.lote + tm.nome)}</td></tr>
         <tr><td colspan="2" class="v-nome">${h(prod.nome_base)}</td></tr>
         <tr><td colspan="2" class="v-data"><span>DATA:</span> ${data(c.cortado_em || c.data)}</td><td rowspan="2" class="v-tam"><small>TAMANHO</small>${h(tm.nome)}</td></tr>
         <tr><th colspan="2" class="v-rot" style="text-align:left">LOTE:</th></tr>

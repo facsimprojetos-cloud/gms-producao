@@ -1,6 +1,6 @@
 :root{
   --bg:#f3f4f6; --card:#fff; --texto:#111827; --sub:#6b7280; --linha:#e5e7eb;
-  --pri:#111827; --pri-2:#374151; --acento:#db2777; --acento-2:#fce7f3;
+  --pri:#0c1a15; --pri-2:#1f3a30; --acento:#d4a72c; --acento-2:#f8edc8; --acento-txt:#0c1a15; /* cores da GMS: verde-escuro e dourado */
   --ok:#059669; --ok-bg:#d1fae5; --alerta:#b45309; --alerta-bg:#fef3c7; --erro:#b91c1c; --erro-bg:#fee2e2;
   --info:#1d4ed8; --info-bg:#dbeafe; --raio:12px; --sombra:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
 }
@@ -18,13 +18,14 @@ h1{font-size:1.35rem}h2{font-size:1.1rem}h3{font-size:1rem}
 /* Layout */
 .layout{display:flex;min-height:100vh}
 .lateral{width:240px;background:var(--pri);color:#e5e7eb;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0}
-.marca{padding:18px 18px 10px;font-weight:900;font-size:1.25rem;letter-spacing:.06em;color:#fff}
+.marca{padding:18px 18px 10px;font-weight:900;font-size:1.25rem;letter-spacing:.06em;color:var(--acento);display:flex;align-items:center;gap:10px}
+.marca img{width:38px;height:38px}
 .marca small{display:block;font-weight:500;font-size:.72rem;letter-spacing:.02em;color:#9ca3af}
 .menu{flex:1;overflow:auto;padding:6px 10px}
 .menu .grupo{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin:14px 8px 4px}
 .menu a{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:9px;color:#e5e7eb;text-decoration:none;font-weight:600;font-size:.92rem}
 .menu a:hover{background:var(--pri-2)}
-.menu a.ativo{background:var(--acento);color:#fff}
+.menu a.ativo{background:var(--acento);color:var(--acento-txt);font-weight:800}
 .menu .ico{width:20px;text-align:center}
 .usuario-box{padding:12px 16px;border-top:1px solid #1f2937;font-size:.85rem}
 .usuario-box .nome{font-weight:700;color:#fff}
@@ -61,7 +62,7 @@ h1{font-size:1.35rem}h2{font-size:1.1rem}h3{font-size:1rem}
 .btn:hover{background:#f9fafb}
 .btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
 .btn.pri:hover{background:var(--pri-2)}
-.btn.acento{background:var(--acento);border-color:var(--acento);color:#fff}
+.btn.acento{background:var(--acento);border-color:var(--acento);color:var(--acento-txt)}
 .btn.perigo{color:var(--erro);border-color:#fecaca}
 .btn.peq{padding:5px 10px;min-height:32px;font-size:.85rem}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -87,7 +88,7 @@ tr.grupo td{background:#f3f4f6;font-weight:800}
 .chip{display:inline-block;font-size:.72rem;font-weight:800;border-radius:6px;padding:3px 7px;white-space:nowrap;background:#f3f4f6;color:var(--pri-2)}
 .chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.alerta{background:var(--alerta-bg);color:var(--alerta)}
 .chip.erro{background:var(--erro-bg);color:var(--erro)} .chip.info{background:var(--info-bg);color:var(--info)}
-.chip.acento{background:var(--acento-2);color:var(--acento)}
+.chip.acento{background:var(--acento-2);color:#7a5b00}
 .muted{color:var(--sub)} .forte{font-weight:800} .peq{font-size:.82rem}
 .abas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .abas button{border:1px solid var(--linha);background:#fff;border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer}
@@ -119,9 +120,9 @@ tr.grupo td{background:#f3f4f6;font-weight:800}
 .toast.erro{background:var(--erro)} .toast.ok{background:var(--ok)}
 
 /* Login */
-.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#111827,#374151)}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 50% 20%,#1f3a30,#0a1511 70%)}
 .login .card{width:100%;max-width:380px}
-.login .marca-login{font-weight:900;font-size:1.8rem;letter-spacing:.08em;text-align:center}
+.login .marca-login{text-align:center;margin-bottom:6px}.login .marca-login img{height:110px;background:#0c1a15;border-radius:14px;padding:10px 18px}
 .login .sub{text-align:center;color:var(--sub);margin-bottom:16px}
 .erro-box{background:var(--erro-bg);color:var(--erro);border-radius:9px;padding:10px;font-size:.9rem;margin:8px 0}
 .aviso-box{background:var(--alerta-bg);color:var(--alerta);border-radius:9px;padding:10px;font-size:.9rem;margin:8px 0}
@@ -231,3 +232,6 @@ tr.grupo td{background:#f3f4f6;font-weight:800}
 @media(max-width:700px){.lista-cards.largo{grid-template-columns:1fr}}
 .vol th{background:none;color:#000}
 .fx-av th{font-size:8pt;padding:1.4mm}.fx-av th small{font-size:6.5pt}.fx-av td{font-size:9pt;padding:1.3mm}.fx-av .fx-conf td{height:6mm}
+/* logo nas impressões (preto e branco, pequeno) */
+.fx-logo{height:13mm;width:auto}
+.vol .v-logo{height:7mm;width:auto;vertical-align:middle}

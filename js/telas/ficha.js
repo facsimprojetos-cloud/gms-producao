@@ -184,7 +184,7 @@ function editarRoteiro(cad, roteiro, depois) {
 }
 
 function imprimirFicha(prod, fp, roteiro, ft, medidas, tams, custo) {
-  imprimirHtml(`<div class="romaneio"><h1>${h(EMPRESA)} — FICHA TÉCNICA</h1>
+  imprimirHtml(`<div class="romaneio"><h1 style="display:flex;align-items:center;gap:4mm"><img src="img/logo-gms-pb.png" alt="" style="height:12mm">${h(EMPRESA)} — FICHA TÉCNICA</h1>
     <p><b>${h(prod.nome)}</b>${prod.codigo ? ` · Código ${h(prod.codigo)}` : ''}${fp.referencia ? ` · Ref. ${h(fp.referencia)}` : ''}</p>
     <p>Criação: ${h(fp.criacao || '—')} · Pilotagem: ${h(fp.pilotagem || '—')} · Grade: ${h(fp.grade || '—')}</p>
     ${fp.info_corte ? `<p><b>Informação de corte:</b> ${h(fp.info_corte)}</p>` : ''}

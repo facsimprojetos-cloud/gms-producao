@@ -65,7 +65,7 @@ async function folhasDoRomaneio(remessaId) {
     const nomeAv = (f) => { const n = f.materias_primas?.nome || ''; const m = n.match(/^(.*?)\s*\(([^)]*)\)\s*$/); return m ? `${h(m[1])}<small>${h(m[2])}</small>` : h(n); };
     const info = (rot, val, cls = '') => `<div class="fx-info ${cls}"><span>${rot}</span><b>${val || '—'}</b></div>`;
     const via = (nome) => `<section class="fx">
-      <header class="fx-topo"><div class="fx-marca">${h(EMPRESA)}</div><div class="fx-tit">Controle de facção<small>Romaneio de envio</small></div><div class="fx-via">${nome}</div></header>
+      <header class="fx-topo"><img class="fx-logo" src="img/logo-gms-pb.png" alt="${h(EMPRESA)}"><div class="fx-tit">Controle de facção<small>Romaneio de envio</small></div><div class="fx-via">${nome}</div></header>
       <div class="fx-destaque">
         <div><span>Lote</span><b class="fx-lote">${h(lote)}</b></div>
         <div class="fx-modelo"><span>Modelo</span><b>${h(modelo)}</b></div>

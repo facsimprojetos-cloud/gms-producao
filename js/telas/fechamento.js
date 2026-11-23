@@ -112,7 +112,7 @@ async function recibo(id) {
     cIds.length ? ler(db.from('v_consertos').select('id,sublote,produto,cor,tamanho').in('id', cIds)) : [],
   ]);
   const info = (i) => i.tipo === 'RETORNO' ? rets.find(r => r.id === i.ref_id) : (x => x && { ...x, lote: x.sublote })(cons.find(c => c.id === i.ref_id));
-  imprimirHtml(`<div class="romaneio"><h1>${h(EMPRESA)} — RECIBO DE PAGAMENTO Nº ${f.numero}</h1>
+  imprimirHtml(`<div class="romaneio"><h1 style="display:flex;align-items:center;gap:4mm"><img src="img/logo-gms-pb.png" alt="" style="height:12mm">${h(EMPRESA)} — RECIBO DE PAGAMENTO Nº ${f.numero}</h1>
     <p>Facção: <b>${h(f.faccao)}</b> · Data: <b>${data(f.data)}</b>${f.pix ? ` · PIX: ${h(f.pix)}` : ''}</p>
     <table><thead><tr><th>Tipo</th><th>Sublote</th><th>Produto</th><th>Cor</th><th>Tam.</th><th>Peças</th><th>R$ peça</th><th>Valor</th></tr></thead>
     <tbody>${itens.map(i => { const x = info(i) || {}; return `<tr><td>${i.tipo === 'RETORNO' ? 'Retorno' : 'Conserto'}</td><td>${h(x.lote || '')}</td><td>${h(x.produto || '')}</td><td>${h(x.cor || '')}</td><td>${h(x.tamanho || '')}</td>

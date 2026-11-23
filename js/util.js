@@ -180,7 +180,9 @@ export function imprimirHtml(html) {
   const area = document.getElementById('impressao');
   area.className = '';
   area.innerHTML = html;
-  setTimeout(() => window.print(), 300);
+  // espera o logo (e outras imagens) carregar antes de abrir a impressão
+  const imgs = [...area.querySelectorAll('img')].filter(i => !i.complete).map(i => new Promise(r => { i.onload = i.onerror = r; }));
+  Promise.race([Promise.all(imgs), new Promise(r => setTimeout(r, 2500))]).then(() => setTimeout(() => window.print(), 150));
 }
 
 // ---------- Utilidades extras (Mali) ----------

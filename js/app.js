@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, SCHEMA, EMPRESA } from './config.js';
 // Versão publicada: muda a cada atualização para o navegador não usar telas antigas do cache
-const VERSAO = '202611231825'; // atualizar a cada publicação
+const VERSAO = '202611231840'; // atualizar a cada publicação
 import { h, toast } from './util.js';
 import { ativarBusca } from './busca.js';
 
@@ -56,7 +56,7 @@ function montarLayout() {
     <div class="topo-mobile"><button id="abre-menu" aria-label="Abrir menu">☰</button><span class="t">${h(EMPRESA)}</span></div>
     <div class="layout">
       <aside class="lateral" id="lateral">
-        <div class="marca">${h(EMPRESA)}<small>Gestão de Produção</small></div>
+        <div class="marca"><img src="img/simbolo-gms.png" alt=""><div>${h(EMPRESA)}<small>Gestão de Produção</small></div></div>
         <nav class="menu">${itens}</nav>
         <div class="usuario-box">
           <div class="nome">${h(ctx.nome)}</div>
@@ -104,7 +104,7 @@ function telaLogin(msg = '', tipo = 'erro') {
   const app = document.getElementById('app');
   app.innerHTML = `
     <div class="login"><div class="card">
-      <div class="marca-login">${h(EMPRESA)}</div>
+      <div class="marca-login"><img src="img/logo-gms.png" alt="${h(EMPRESA)}"></div>
       <div class="sub">Gestão de Produção</div>
       ${msg ? `<div class="${tipo}-box">${h(msg)}</div>` : ''}
       <form id="f-login" class="grade">
@@ -150,7 +150,7 @@ function telaSemAcesso(status, email) {
   const semAdmin = !status.tem_admin;
   app.innerHTML = `
     <div class="login"><div class="card">
-      <div class="marca-login">${h(EMPRESA)}</div>
+      <div class="marca-login"><img src="img/logo-gms.png" alt="${h(EMPRESA)}"></div>
       <div class="sub">${h(email)}</div>
       ${semAdmin ? `
         <div class="aviso-box">Nenhum administrador configurado ainda. Como primeiro acesso, você pode se tornar o administrador.</div>
