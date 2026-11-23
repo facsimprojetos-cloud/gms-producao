@@ -145,10 +145,10 @@ async function renderRemessas(el) {
   const lista = rems.filter(r => contem(r, ['lotes', 'produtos', 'faccao', 'obs'], busca));
   el.innerHTML = `${cab(pode)}
     <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Lote, produto, facção…"></label></div>
-    <div class="tabela-wrap"><table><thead><tr><th>Lote</th><th>Produto</th><th>Facção</th><th>Data de envio</th><th class="n">Peças</th><th>Previsão</th><th></th></tr></thead>
-    <tbody>${lista.map(r => `<tr><td class="forte">${h(r.lotes)}</td><td>${h(r.produtos)}</td><td>${h(r.faccao)}</td><td>${data(r.data)}</td><td class="n">${num(r.qtd_total)}</td><td>${data(r.previsao)}</td>
+    <div class="tabela-wrap"><table><thead><tr><th>Lote</th><th>Produto</th><th>Facção</th><th>Data de envio</th><th class="n">Peças</th><th></th></tr></thead>
+    <tbody>${lista.map(r => `<tr><td class="forte" style="white-space:nowrap">${h(r.lotes)}</td><td>${h(r.produtos)}</td><td>${h(r.faccao)}</td><td>${data(r.data)}</td><td class="n">${num(r.qtd_total)}</td>
       <td><div class="acoes"><button class="btn peq pri" data-folha="${r.id}">🖨 Folha da facção</button>${pode ? `<button class="btn peq" data-ed="${r.id}">Editar</button>` : ''}</div></td></tr>`).join('')
-      || '<tr><td colspan="7" class="vazio">Nenhum romaneio.</td></tr>'}</tbody></table></div>`;
+      || '<tr><td colspan="6" class="vazio">Nenhum romaneio.</td></tr>'}</tbody></table></div>`;
   ligarAbas(el);
   el.querySelector('#busca').onchange = (e) => { busca = e.target.value; render(el); };
   el.querySelectorAll('[data-folha]').forEach(b => b.onclick = () => imprimirFolhaFaccao(b.dataset.folha));
