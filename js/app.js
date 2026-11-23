@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, SCHEMA, EMPRESA } from './config.js';
 // Versão publicada: muda a cada atualização para o navegador não usar telas antigas do cache
-const VERSAO = '202611121900'; // atualizar a cada publicação
+const VERSAO = '202611231100'; // atualizar a cada publicação
 import { h, toast } from './util.js';
 
 export const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -19,20 +19,19 @@ export function tem(perfil) {
 const ROTAS = [
   { grupo: 'Início' },
   { hash: '#/painel', nome: 'Painel', ico: '📊', modulo: 'painel' },
-  { hash: '#/pedidos', nome: 'Pedidos', ico: '🧾', modulo: 'pedidos' },
   { grupo: 'Corte e distribuição' },
   { hash: '#/corte', nome: '1 - Corte', ico: '✂️', modulo: 'corte' },
   { hash: '#/lotes', nome: '2 - Lotes / Envio', ico: '📦', modulo: 'lotes' },
   { hash: '#/faccao', nome: '3 - Gestão de Facção', ico: '🧵', modulo: 'faccao' },
   { hash: '#/consertos', nome: 'Consertos', ico: '🛠️', modulo: 'consertos' },
   { grupo: 'Produção' },
-  { hash: '#/producao', nome: 'Produção Interna', ico: '⏱️', modulo: 'producao' },
-  { hash: '#/estamparia', nome: 'Estamparia', ico: '🎨', modulo: 'etapas', tipo: 'ESTAMPARIA' },
-  { hash: '#/finalizacao', nome: 'Finalização', ico: '🪡', modulo: 'etapas', tipo: 'FINALIZAÇÃO' },
-  { hash: '#/inspecao', nome: 'Inspeção', ico: '🔍', modulo: 'etapas', tipo: 'INSPEÇÃO' },
-  { grupo: 'Estoque e entrega' },
-  { hash: '#/estoque', nome: 'Estoque', ico: '🏬', modulo: 'estoque' },
-  { hash: '#/expedicao', nome: 'Expedição', ico: '🚚', modulo: 'expedicao' },
+  { hash: '#/apontador', nome: 'Apontador', ico: '⏱️', modulo: 'apontador' },
+  { hash: '#/prontos', nome: 'Peças prontas', ico: '✅', modulo: 'prontos' },
+  { grupo: 'Estoque' },
+  { hash: '#/sku', nome: 'SKU / Upseller', ico: '🏷️', modulo: 'sku' },
+  { hash: '#/materiais', nome: 'Aviamentos e almoxarifado', ico: '🧷', modulo: 'materiais' },
+  // Telas da Mali que a GMS ainda não usa (pedidos, estamparia, finalização, inspeção, estoque por produto, expedição, produção interna por envio):
+  // os arquivos continuam em js/telas/ e podem voltar ao menu quando forem adotadas.
   { grupo: 'Gestão' },
   { hash: '#/fechamento', nome: 'Fechamento Facção', ico: '💰', modulo: 'fechamento' },
   { hash: '#/ficha', nome: 'Ficha Técnica', ico: '📐', modulo: 'ficha' },
