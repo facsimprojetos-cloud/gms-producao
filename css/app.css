@@ -178,9 +178,9 @@ tr.grupo td{background:#f3f4f6;font-weight:800}
 .fx-destaque>div{background:#f3f4f6;border-radius:2mm;padding:1.8mm 3.5mm;display:flex;align-items:baseline;gap:2.5mm;white-space:nowrap;overflow:hidden}
 .fx-destaque span{font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6b7280}
 .fx-info span{display:block;font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#6b7280}
-.fx-lote{font-size:12pt;font-weight:900;white-space:nowrap}
-.fx-modelo b{font-size:12pt;font-weight:800;overflow:hidden;text-overflow:ellipsis}
-.fx-total{background:#111827!important;color:#fff}.fx-total span{color:#d1d5db}.fx-total b{font-size:12pt;font-weight:900}.fx-total small{font-size:8pt}
+.fx-lote{font-size:11pt;font-weight:900;white-space:nowrap}
+.fx-modelo{white-space:normal!important;min-width:0}.fx-modelo b{font-size:10.5pt;font-weight:800}
+.fx-total{background:#111827!important;color:#fff}.fx-total span{color:#d1d5db}.fx-total b{font-size:11pt;font-weight:900}.fx-total small{font-size:8pt}
 .fx-infos{display:grid;grid-template-columns:2fr 1fr;border:1px solid #d1d5db;border-radius:2.5mm;overflow:hidden}
 .fx-info{padding:1.5mm 3mm;border-bottom:1px solid #e5e7eb}.fx-info:nth-child(odd){border-right:1px solid #e5e7eb}
 .fx-info:nth-last-child(-n+2){border-bottom:0}.fx-info b{font-size:9.5pt;font-weight:700}
