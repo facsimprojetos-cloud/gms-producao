@@ -18,7 +18,7 @@ export async function render(el) {
   const sup = tem('supervisor');
 
   el.innerHTML = `
-    <div class="cab"><div><h1>1 - Corte</h1><p>Programe o corte (cores × folhas, tamanhos × riscos). Ao confirmar, cada cor × tamanho vira um sublote e cada risco uma etiqueta.</p></div>
+    <div class="cab"><div><h1>1 - Corte</h1><p>Programe o corte (cores × folhas, tamanhos × riscos). Ao cortar, abre a etiqueta de volume: só sacos ou dividir o lote e registrar.</p></div>
       ${pode ? '<button class="btn acento" id="novo">+ Novo corte</button>' : ''}</div>
     <div class="abas">
       ${[['Programado', 'A cortar'], ['Cortado', 'Cortados'], ['Cancelado', 'Cancelados'], ['todos', 'Todos']].map(([k, r]) => `<button data-f="${k}" class="${filtro === k ? 'ativo' : ''}">${r}</button>`).join('')}
@@ -74,7 +74,7 @@ function cartao(c, pode, sup) {
     <div class="acoes" style="margin-top:10px">
       ${pode && c.status === 'Programado' ? `<button class="btn pri peq" data-acao="confirmar" data-id="${c.id}">✂️ Cortar</button>` : ''}
       ${pode && c.status === 'Programado' ? `<button class="btn peq" data-acao="editar" data-id="${c.id}">Editar</button>` : ''}
-      ${c.status === 'Cortado' ? `<button class="btn peq" data-acao="volumes" data-id="${c.id}">📦 Etiqueta de volume</button><button class="btn peq" data-acao="etiquetas" data-id="${c.id}">🏷️ Etiquetas</button><button class="btn peq" data-acao="sublotes" data-id="${c.id}">Sublotes</button>${pode ? `<button class="btn peq" data-acao="faccao" data-id="${c.id}">Facção</button>` : ''}` : ''}
+      ${c.status === 'Cortado' ? `<button class="btn peq" data-acao="volumes" data-id="${c.id}">📦 Etiqueta de volume</button><button class="btn peq" data-acao="sublotes" data-id="${c.id}">Sublotes</button>${pode ? `<button class="btn peq" data-acao="faccao" data-id="${c.id}">Facção</button>` : ''}` : ''}
       ${pode ? `<button class="btn peq" data-acao="duplicar" data-id="${c.id}">Duplicar</button>` : ''}
       ${pode && c.status === 'Programado' ? `<button class="btn peq perigo" data-acao="cancelar" data-id="${c.id}">Cancelar</button>` : ''}
       ${sup && c.status === 'Cortado' ? `<button class="btn peq perigo" data-acao="estornar" data-id="${c.id}">↩ Estornar</button>` : ''}
@@ -156,7 +156,7 @@ function telaConfirmar(c, depois) {
   const linhas = [];
   for (const t of c.tamanhos) for (const cor of c.cores) linhas.push({ cor, t });
   const corpo = `
-    <p>Confira as folhas e os riscos reais antes de confirmar. Cada cor × tamanho vira um sublote; cada risco vira uma etiqueta.
+    <p>Confira as folhas e os riscos reais antes de confirmar. Cada cor × tamanho vira um sublote. Ao confirmar, abre a etiqueta de volume.
 </p>
     <div class="grade g2">
       <div><h3>Folhas por cor</h3>${c.cores.map(x => `<label class="campo">${h(x.cor)}<input type="number" min="1" step="1" data-cor="${x.posicao}" value="${x.folhas}"></label>`).join('')}</div>
@@ -177,7 +177,7 @@ function telaConfirmar(c, depois) {
       m.addEventListener('input', atualizar); atualizar();
     },
     botoes: [{ texto: 'Cancelar' }, {
-      texto: 'Confirmar corte e gerar etiquetas', classe: 'pri', acao: async (m) => {
+      texto: 'Confirmar corte', classe: 'pri', acao: async (m) => {
         const ajustes = {
           cores: [...m.querySelectorAll('[data-cor]')].map(i => ({ posicao: +i.dataset.cor, folhas: +i.value })),
           tamanhos: [...m.querySelectorAll('[data-tam]')].map(i => ({ posicao: +i.dataset.tam, riscos: +i.value })),
@@ -187,7 +187,7 @@ function telaConfirmar(c, depois) {
         const r = await chamar(db, 'confirmar_corte', { p_corte_id: c.id, p_ajustes: ajustes });
         if (!r) return false;
         toast(r.mensagem, 'ok'); depois();
-        if (r.etiquetas?.length && await confirmar('Etiquetas', `${r.etiquetas.length} etiquetas prontas. Imprimir agora?`, 'Imprimir')) imprimirEtiquetas(r.etiquetas, EMPRESA);
+        etiquetaVolume(c); // depois do corte já abre a etiqueta de volume (só sacos ou dividir e registrar)
       }
     }]
   });
