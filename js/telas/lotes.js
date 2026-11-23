@@ -138,14 +138,9 @@ async function telaEnvio(itens, depois, facPadrao = null) {
 
 async function renderRemessas(el) {
   const cad = await cadastros(db);
-  const rems = await ler(db.from('v_remessas').select('*').order('data', { ascending: false }).limit(200));
-  const envs = rems.length ? await ler(db.from('v_envios').select('remessa_id,lote,produto_id').in('remessa_id', rems.map(r => r.id))) : [];
+  const rems = await ler(db.from('v_romaneios').select('*').order('data', { ascending: false }).limit(300));
   const pode = tem('faccao');
-  rems.forEach(r => {
-    const es = envs.filter(e => e.remessa_id === r.id);
-    r.lotes = [...new Set(es.map(e => String(e.lote || '').replace(/\.\d+$/, '') || '(sem número)'))].join(', ');
-    r.produtos = [...new Set(es.map(e => cad.produtos.find(p => p.id === e.produto_id)?.nome || ''))].join(', ');
-  });
+  rems.forEach(r => { r.lotes = r.lotes || ''; r.produtos = (r.produto_ids || []).map(id => cad.produtos.find(p => p.id === id)?.nome || '').join(', '); });
   const lista = rems.filter(r => contem(r, ['lotes', 'produtos', 'faccao', 'obs'], busca));
   el.innerHTML = `${cab(pode)}
     <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Lote, produto, facção…"></label></div>
