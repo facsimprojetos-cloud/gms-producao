@@ -3,6 +3,7 @@ import { h, num, moeda, data, chip, modal, chamar, ler, cadastros, opcoes, toast
 
 let aba = 'aberto';
 let fFac = '', fAtraso = '', busca = '', fProd = '';
+const abertosFac = new Set(); // lotes abertos (lote|romaneio)
 
 export async function render(el) {
   const pode = tem('faccao'), sup = tem('supervisor');
@@ -33,18 +34,19 @@ export async function render(el) {
   el.querySelector('#fp').onchange = (e) => { fProd = e.target.value; render(el); };
   el.querySelector('#fb').onchange = (e) => { busca = e.target.value; render(el); };
 
+  // facção → lotes (uma linha por lote) → variações (abre o lote)
+  const loteDe = (e) => String(e.lote || '').replace(/\.\d+$/, '') || '(sem número)';
   const grupos = new Map();
-  filtrada.forEach(e => { if (!grupos.has(e.faccao)) grupos.set(e.faccao, []); grupos.get(e.faccao).push(e); });
-  el.querySelector('#lista').innerHTML = [...grupos.entries()].map(([fac, itens]) => `
-    <h2 style="margin-top:14px">${h(fac)} <span class="muted peq">${num(itens.reduce((a, e) => a + e.saldo, 0))} peças pendentes · ${itens.length} envio(s)</span></h2>
-    <div class="tabela-wrap"><table><thead><tr><th>Sublote</th><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Enviado</th><th class="n">Retornado</th><th class="n">Saldo</th>
-      <th>Envio</th><th>Previsão</th><th>Prazo</th><th>Ocorrência</th><th></th></tr></thead>
-    <tbody>${itens.map(e => `<tr>
-      <td class="forte">${h(e.lote)}</td><td>${h(e.produto)}</td><td>${h(e.cor)}</td><td>${h(e.tamanho)}</td>
+  filtrada.forEach(e => {
+    if (!grupos.has(e.faccao)) grupos.set(e.faccao, new Map());
+    const g = grupos.get(e.faccao), k = loteDe(e) + '|' + e.remessa_id;
+    if (!g.has(k)) g.set(k, []); g.get(k).push(e);
+  });
+  const piorPrazo = (es) => { const at = es.filter(e => /atraso|Atrasado/.test(e.atraso)); const d = Math.max(0, ...es.map(e => e.dias_atraso || 0)); return at.length ? chip(`${at[0].atraso}${d ? ` (${d}d)` : ''}`, 'erro') : chip(es[0].atraso, 'ok'); };
+  const linhaVar = (e) => `<tr class="var-linha">
+      <td></td><td>${h(e.lote)}</td><td>${h(e.cor)}</td><td>${h(e.tamanho)}</td>
       <td class="n">${num(e.qtd)}</td><td class="n">${num(e.qtd - e.saldo)}</td><td class="n forte">${num(e.saldo)}</td>
-      <td>${data(e.remessa_data)}</td><td>${data(e.previsao)}</td>
-      <td>${chip(e.atraso + (e.dias_atraso ? ` (${e.dias_atraso}d)` : ''), /atraso|Atrasado/.test(e.atraso) ? 'erro' : 'ok')}</td>
-      <td class="peq">${h(e.ocorrencia || '')}</td>
+      <td colspan="2" class="peq">${h(e.ocorrencia || '')}</td>
       <td><div class="acoes">
         ${pode && !e.data_retorno ? `<button class="btn pri peq" data-ret="${e.id}">Retorno</button>` : ''}
         ${pode && !e.data_retorno ? `<button class="btn peq" data-oc="${e.id}">Ocorrência</button>` : ''}
@@ -52,7 +54,25 @@ export async function render(el) {
         ${pode && !e.data_retorno && e.saldo > 0 && e.qtd - e.saldo > 0 ? `<button class="btn peq" data-fin="${e.id}">Encerrar saldo</button>` : ''}
         ${sup && e.data_retorno && e.saldo > 0 ? `<button class="btn peq" data-reab="${e.id}">Reabrir</button>` : ''}
         ${sup && e.qtd === e.saldo ? `<button class="btn peq perigo" data-del="${e.id}">🗑</button>` : ''}
-      </div></td></tr>`).join('')}</tbody></table></div>`).join('') || '<div class="vazio">Nada por aqui.</div>';
+      </div></td></tr>`;
+  el.querySelector('#lista').innerHTML = [...grupos.entries()].map(([fac, lotes]) => {
+    const todos = [...lotes.values()].flat();
+    return `
+    <h2 style="margin-top:14px">${h(fac)} <span class="muted peq">${num(todos.reduce((a, e) => a + e.saldo, 0))} peças pendentes · ${lotes.size} lote(s)</span></h2>
+    <div class="tabela-wrap"><table><thead><tr><th>Lote</th><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Enviado</th><th class="n">Retornado</th><th class="n">Saldo</th>
+      <th>Envio / previsão</th><th>Prazo</th><th></th></tr></thead>
+    <tbody>${[...lotes.entries()].map(([k, es]) => { const x = es[0], aberto = abertosFac.has(k), abertos = es.filter(e => !e.data_retorno && e.saldo > 0);
+      const cores = [...new Set(es.map(e => e.cor))], tams = [...new Set(es.map(e => e.tamanho))];
+      return `<tr class="grupo lote-linha"><td class="forte" style="white-space:nowrap">${h(loteDe(x))}</td><td>${h(x.produto)}</td>
+        <td class="peq">${cores.length} cor(es)</td><td class="peq">${h(tams.join(' '))}</td>
+        <td class="n">${num(es.reduce((a, e) => a + e.qtd, 0))}</td><td class="n">${num(es.reduce((a, e) => a + e.qtd - e.saldo, 0))}</td><td class="n forte">${num(es.reduce((a, e) => a + e.saldo, 0))}</td>
+        <td class="peq">${data(x.remessa_data)} → ${data(x.previsao)}</td><td>${piorPrazo(es)}</td>
+        <td><div class="acoes"><button class="btn peq" data-abrir="${h(k)}">${aberto ? '▾ Fechar' : '▸ Variações'}</button>
+          ${pode && abertos.length ? `<button class="btn pri peq" data-retlote="${h(k)}">Retorno do lote</button>` : ''}</div></td></tr>
+        ${aberto ? es.map(linhaVar).join('') : ''}`; }).join('')}</tbody></table></div>`; }).join('') || '<div class="vazio">Nada por aqui.</div>';
+  const lotesPorChave = new Map(); grupos.forEach(g => g.forEach((es, k) => lotesPorChave.set(k, es)));
+  el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { const k = b.dataset.abrir; abertosFac.has(k) ? abertosFac.delete(k) : abertosFac.add(k); render(el); });
+  el.querySelectorAll('[data-retlote]').forEach(b => b.onclick = () => retornoLote(lotesPorChave.get(b.dataset.retlote).filter(e => !e.data_retorno && e.saldo > 0), () => render(el)));
 
   const acha = (id) => filtrada.find(x => x.id === id);
   el.querySelectorAll('[data-ret]').forEach(b => b.onclick = () => formRetorno(acha(b.dataset.ret), cad, () => render(el)));
@@ -112,4 +132,37 @@ async function historico(e, depois) {
     const mt = await pedirTexto('Excluir retorno', 'As peças voltam a ficar pendentes na facção. Só é possível se a etapa seguinte não começou.', { botao: 'Excluir retorno' });
     if (mt && await chamar(db, 'excluir_retorno', { p_retorno_id: b.dataset.x, p_motivo: mt })) { toast('Retorno excluído.', 'ok'); m.fechar(); depois(); }
   });
+}
+
+// Retorno do lote inteiro: uma linha por variação (boas / consertos / defeito), mesmo próximo processo e data
+function retornoLote(es, depois) {
+  es.sort((a, b) => (a.tamanho_ordem ?? 0) - (b.tamanho_ordem ?? 0) || String(a.cor).localeCompare(String(b.cor)));
+  const lote = String(es[0].lote || '').replace(/\.\d+$/, '');
+  modal({ titulo: `Retorno do lote ${lote} — ${es[0].faccao}`, largo: true,
+    corpo: `<p class="muted peq">Já vem preenchido com tudo pendente como peças boas. Ajuste consertos (voltam para a facção, pagos junto com o lote) e defeito (a descontar). Linha com tudo zerado não é registrada.</p>
+      <div class="tabela-wrap"><table><thead><tr><th>Cor</th><th>Tam.</th><th class="n">Pendente</th><th class="n">Boas</th><th class="n">Consertos</th><th class="n">Defeito</th></tr></thead>
+      <tbody>${es.map(e => `<tr data-id="${e.id}" data-pend="${e.saldo}"><td>${h(e.cor)}</td><td>${h(e.tamanho)}</td><td class="n">${num(e.saldo)}</td>
+        <td class="n"><input class="inp num" type="number" min="0" max="${e.saldo}" data-c="boas" value="${e.saldo}"></td>
+        <td class="n"><input class="inp num" type="number" min="0" max="${e.saldo}" data-c="cons" value="0"></td>
+        <td class="n"><input class="inp num" type="number" min="0" max="${e.saldo}" data-c="def" value="0"></td></tr>`).join('')}</tbody>
+      <tfoot><tr class="grupo"><td colspan="3">Total</td><td class="n" id="tb"></td><td class="n" id="tc"></td><td class="n" id="td"></td></tr></tfoot></table></div>
+      <div class="grade g3" style="margin-top:10px">
+        <label class="campo">Próximo processo<select id="prox">${PROXIMOS.map(k => `<option value="${k}">${DESTINOS[k]}</option>`).join('')}</select></label>
+        <label class="campo">Data do retorno<input type="date" id="dt" value="${hojeISO()}" max="${hojeISO()}"></label>
+        <label class="campo">Observação<input id="obs"></label></div>`,
+    aoAbrir: (m) => {
+      const tot = () => ['boas', 'cons', 'def'].forEach((c, i) => { m.querySelector(['#tb', '#tc', '#td'][i]).textContent = num([...m.querySelectorAll(`[data-c=${c}]`)].reduce((a, x) => a + (+x.value || 0), 0)); });
+      m.addEventListener('input', tot); tot();
+    },
+    botoes: [{ texto: 'Cancelar' }, { texto: 'Registrar retorno', classe: 'pri', acao: async (m) => {
+      const linhas = [...m.querySelectorAll('tbody tr')].map(tr => ({ id: tr.dataset.id, pend: +tr.dataset.pend, b: +tr.querySelector('[data-c=boas]').value || 0, c: +tr.querySelector('[data-c=cons]').value || 0, d: +tr.querySelector('[data-c=def]').value || 0 }));
+      const ruim = linhas.find(l => l.b < 0 || l.c < 0 || l.d < 0 || l.b + l.c + l.d > l.pend);
+      if (ruim) { toast('Em alguma linha boas + consertos + defeito passou do pendente.', 'erro'); return false; }
+      const validas = linhas.filter(l => l.b + l.c + l.d > 0);
+      if (!validas.length) { toast('Nada para registrar.', 'erro'); return false; }
+      const prox = m.querySelector('#prox').value, dt = m.querySelector('#dt').value || null, obs = m.querySelector('#obs').value || null;
+      let ok = 0;
+      for (const l of validas) { if (await chamar(db, 'registrar_retorno', { p_envio_id: l.id, p_qtd: l.b, p_conserto: l.c, p_defeito: l.d, p_proximo: prox, p_data: dt, p_obs: obs })) ok++; else break; }
+      toast(`Retorno registrado em ${ok} de ${validas.length} variação(ões).`, ok === validas.length ? 'ok' : 'erro'); depois();
+    } }] });
 }

@@ -69,8 +69,8 @@ function cartao(c, pode, sup) {
     <div class="linha1"><div><div class="tit">Lote ${h(c.lote)}</div><div class="det">${h(c.produto)} · ${c.cortado_em && data(c.cortado_em) !== data(c.data) ? `programado ${data(c.data)} · <b>cortado ${data(c.cortado_em)}</b>` : data(c.cortado_em || c.data)}</div></div>
       ${chip(c.status, COR_STATUS[c.status])}</div>
     <div class="det" style="margin-top:8px">${c.faccao ? chip('Facção: ' + c.faccao, 'info') : chip('Sem facção definida', '')}</div>
-    <div class="det" style="margin-top:6px">Folhas: ${cores}</div>
-    <div class="det">Riscos: ${tams}</div>
+    ${cores ? `<div class="det" style="margin-top:6px">Folhas: ${cores}</div>` : ''}
+    ${tams ? `<div class="det">Riscos: ${tams}</div>` : ''}
     <div class="det">Total: <b>${num(c.total_pecas)}</b> peças</div>
     ${c.obs ? `<div class="det">Obs.: ${h(c.obs)}</div>` : ''}
     <div class="acoes" style="margin-top:10px">

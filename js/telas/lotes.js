@@ -37,7 +37,8 @@ export async function render(el) {
           <td colspan="${ncol - (pode ? 2 : 1)}"><button class="btn peq" data-abrir="${cid}">${aberto ? '▾' : '▸'} ${aberto ? 'Fechar' : 'Ver variações'}</button>
             <b style="margin-left:8px">Lote ${h(x.lote || '(sem número)')}</b> · ${h(x.produto)}${x.faccao_corte ? ` · <b>${h(x.faccao_corte)}</b>` : ''}
             <span class="muted peq"> · ${cores.length} cor(es) · ${h(tams.join(' '))}</span>
-            ${sup ? `<button class="btn peq perigo" data-apagar="${cid}" style="margin-left:8px">🗑 Apagar lote</button>` : ''}</td>
+            ${tem('corte') ? `<button class="btn peq" data-trocar="${cid}" style="margin-left:8px">${x.faccao_corte ? 'Trocar facção' : 'Definir facção'}</button>` : ''}
+            ${sup ? `<button class="btn peq perigo" data-apagar="${cid}" style="margin-left:4px">🗑 Apagar lote</button>` : ''}</td>
           <td class="n forte">${num(itens.reduce((a, s) => a + s.qtd_saldo, 0))}</td></tr>
         ${aberto ? itens.map(s => `<tr>
           ${pode ? `<td><input type="checkbox" data-sel="${s.id}" ${selecionados.has(s.id) ? 'checked' : ''}></td>` : ''}
@@ -51,7 +52,7 @@ export async function render(el) {
   el.querySelector('#busca').onchange = (e) => { busca = e.target.value; render(el); };
   el.querySelectorAll('[data-meio]').forEach(cb => { cb.indeterminate = true; });
   const btn = el.querySelector('#enviar');
-  const atualizar = () => { if (btn) { btn.disabled = !selecionados.size; btn.textContent = `Enviar para facção (${selecionados.size})`; } };
+  const atualizar = () => { if (btn) { btn.disabled = !selecionados.size; btn.textContent = `Enviar para facção (${selecionados.size})`; } const d = el.querySelector('#desmembrar'); if (d) { d.disabled = !selecionados.size; d.textContent = `✂ Desmembrar lote (${selecionados.size})`; } };
   el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { const id = b.dataset.abrir; abertos.has(id) ? abertos.delete(id) : abertos.add(id); render(el); });
   el.querySelectorAll('[data-sel]').forEach(cb => cb.onchange = () => {
     const id = cb.dataset.sel, qi = el.querySelector(`[data-qtd="${id}"]`);
@@ -69,6 +70,31 @@ export async function render(el) {
     if (m && await chamar(db, 'apagar_lote', { p_corte_id: b.dataset.apagar, p_motivo: m })) { itens.forEach(s => selecionados.delete(s.id)); toast('Lote apagado.', 'ok'); render(el); }
   });
   el.querySelectorAll('[data-qtd]').forEach(i => i.oninput = () => { if (selecionados.has(i.dataset.qtd)) selecionados.set(i.dataset.qtd, +i.value); });
+  el.querySelectorAll('[data-trocar]').forEach(b => b.onclick = async () => {
+    const x = grupos.get(b.dataset.trocar)[0];
+    const v = await formModal({ titulo: `Facção do lote ${x.lote}`, botao: 'Salvar', texto: '<p class="muted peq">Vale para o lote inteiro. Para mandar só algumas variações para outra facção, marque as variações e use <b>Desmembrar lote</b>.</p>',
+      campos: [{ k: 'f', r: 'Facção', tipo: 'select', vazio: 'Sem facção (aguardando distribuição)', valor: x.faccao_corte_id, opcoes: cad.faccoes.filter(f => f.ativo).map(f => [f.id, f.nome]) }] });
+    if (v && await chamar(db, 'definir_faccao_corte', { p_corte_id: b.dataset.trocar, p_faccao_id: v.f ? +v.f : null })) { toast('Facção do lote atualizada.', 'ok'); render(el); }
+  });
+  el.querySelector('#desmembrar')?.addEventListener('click', async () => {
+    const itens = lista.filter(s => selecionados.has(s.id));
+    const cortes = [...new Set(itens.map(s => s.corte_id))];
+    if (cortes.length !== 1) return toast('Para desmembrar, marque variações de um lote só.', 'erro');
+    const x = itens[0];
+    const v = await formModal({ titulo: `Desmembrar o lote ${x.lote}`, botao: 'Criar lote novo', largo: true,
+      texto: `<p>As variações abaixo saem do lote <b>${h(x.lote)}</b> e viram um <b>lote novo</b> (próximo número do mês), com a observação "Lote desmembrado do ${h(x.lote)}". Ajuste a quantidade se for só uma parte.</p>`,
+      campos: [...itens.map(s => ({ k: 'q_' + s.id, r: `${s.cor} · ${s.tamanho} (disponível ${s.qtd_saldo})`, tipo: 'number', min: 1, max: s.qtd_saldo, step: 1, valor: selecionados.get(s.id) || s.qtd_saldo, req: true })),
+        { k: 'fac', r: 'Facção do lote novo', tipo: 'select', vazio: 'Sem facção (aguardando distribuição)', opcoes: cad.faccoes.filter(f => f.ativo).map(f => [f.id, f.nome]) },
+        { k: 'obs', r: 'Observação (opcional)' }],
+      validar: (o) => itens.every(s => o['q_' + s.id] >= 1 && o['q_' + s.id] <= s.qtd_saldo && o['q_' + s.id] % 1 === 0) ? null : 'Quantidade inválida em alguma variação.' });
+    if (!v) return;
+    const r = await chamar(db, 'desmembrar_lote', { p_corte_id: x.corte_id, p_itens: itens.map(s => ({ sublote_id: s.id, qtd: v['q_' + s.id] })), p_faccao_id: v.fac ? +v.fac : null, p_obs: v.obs });
+    if (!r) return;
+    selecionados.clear(); toast(`Lote ${r.lote} criado com ${num(r.pecas)} peças, desmembrado do ${r.origem}.`, 'ok');
+    if (v.fac) aba = 'envio';
+    render(el);
+  });
+  const bd = el.querySelector('#desmembrar'); if (bd) { bd.disabled = !selecionados.size; }
   atualizar();
   btn?.addEventListener('click', () => {
     const itens = lista.filter(s => selecionados.has(s.id));
@@ -80,7 +106,7 @@ export async function render(el) {
 
 function cab(pode) {
   return `<div class="cab"><div><h1>2 - Lotes / Envio</h1><p>Aguardando distribuição: lotes cortados sem facção. Aguardando envio: lotes que já têm facção definida no corte. Ao enviar sai a folha da facção (romaneio + aviamentos).</p></div>
-      ${pode && aba !== 'remessas' ? `<button class="btn acento" id="enviar" ${selecionados.size ? '' : 'disabled'}>Enviar para facção (${selecionados.size})</button>` : ''}</div>
+      ${pode && aba !== 'remessas' ? `<div class="acoes">${tem('corte') ? `<button class="btn" id="desmembrar" ${selecionados.size ? '' : 'disabled'}>✂ Desmembrar lote (${selecionados.size})</button>` : ''}<button class="btn acento" id="enviar" ${selecionados.size ? '' : 'disabled'}>Enviar para facção (${selecionados.size})</button></div>` : ''}</div>
     <div class="abas">
       <button data-a="separar" class="${aba === 'separar' ? 'ativo' : ''}">Aguardando distribuição</button>
       <button data-a="envio" class="${aba === 'envio' ? 'ativo' : ''}">Aguardando envio</button>
