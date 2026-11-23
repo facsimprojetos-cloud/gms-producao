@@ -1,6 +1,6 @@
 import { db, tem } from '../app.js';
 import { EMPRESA } from '../config.js';
-import { h, num, data, chip, modal, confirmar, chamar, ler, cadastros, opcoes, toast, imprimirEtiquetas, pedirTexto, contem } from '../util.js';
+import { h, num, data, formModal, imprimirHtml, chip, modal, confirmar, chamar, ler, cadastros, opcoes, toast, imprimirEtiquetas, pedirTexto, contem } from '../util.js';
 
 const COR_STATUS = { 'Programado': 'alerta', 'Cortado': 'ok', 'Cancelado': 'erro' };
 let filtro = 'Programado';
@@ -33,6 +33,7 @@ export async function render(el) {
     if (ac === 'duplicar') formCorte(cad, { ...c, id: null, pedido_id: null }, () => render(el));
     if (ac === 'confirmar') telaConfirmar(c, () => render(el));
     if (ac === 'sublotes') verSublotes(c);
+    if (ac === 'volumes') return etiquetaVolume(c);
     if (ac === 'etiquetas') {
       const { data: r } = await db.from('cortes').select('etiquetas').eq('id', c.id).single();
       if (r?.etiquetas?.length) imprimirEtiquetas(r.etiquetas, EMPRESA); else toast('Sem etiquetas salvas.', 'erro');
@@ -66,7 +67,7 @@ function cartao(c, pode, sup) {
     <div class="acoes" style="margin-top:10px">
       ${pode && c.status === 'Programado' ? `<button class="btn pri peq" data-acao="confirmar" data-id="${c.id}">✂️ Cortar</button>` : ''}
       ${pode && c.status === 'Programado' ? `<button class="btn peq" data-acao="editar" data-id="${c.id}">Editar</button>` : ''}
-      ${c.status === 'Cortado' ? `<button class="btn peq" data-acao="etiquetas" data-id="${c.id}">🏷️ Etiquetas</button><button class="btn peq" data-acao="sublotes" data-id="${c.id}">Sublotes</button>` : ''}
+      ${c.status === 'Cortado' ? `<button class="btn peq" data-acao="volumes" data-id="${c.id}">📦 Etiqueta de volume</button><button class="btn peq" data-acao="etiquetas" data-id="${c.id}">🏷️ Etiquetas</button><button class="btn peq" data-acao="sublotes" data-id="${c.id}">Sublotes</button>` : ''}
       ${pode ? `<button class="btn peq" data-acao="duplicar" data-id="${c.id}">Duplicar</button>` : ''}
       ${pode && c.status === 'Programado' ? `<button class="btn peq perigo" data-acao="cancelar" data-id="${c.id}">Cancelar</button>` : ''}
       ${sup && c.status === 'Cortado' ? `<button class="btn peq perigo" data-acao="estornar" data-id="${c.id}">↩ Estornar</button>` : ''}
@@ -186,4 +187,26 @@ function telaConfirmar(c, depois) {
       }
     }]
   });
+}
+
+// Etiqueta de volume no modelo da planilha ETIQUETA GMS (aba ETIQUETA_CORTE): lote, data do corte, produto,
+// tamanho e volume n/N; QR = lote + tamanho. Os volumes de cada tamanho são informados na hora.
+async function etiquetaVolume(c) {
+  const subs = await ler(db.from('v_sublotes').select('tamanho,tamanho_ordem,qtd_cortada').eq('corte_id', c.id));
+  const tams = [...new Map(subs.map(s => [s.tamanho, s.tamanho_ordem ?? 0])).entries()].sort((a, b) => a[1] - b[1]).map(x => x[0]);
+  if (!tams.length) return toast('Este corte não tem sublotes.', 'erro');
+  const pecas = (t) => subs.filter(s => s.tamanho === t).reduce((a, s) => a + Number(s.qtd_cortada || 0), 0);
+  const v = await formModal({ titulo: `Etiqueta de volume · lote ${c.lote}`, botao: 'Imprimir',
+    texto: '<p class="peq muted">Informe quantos volumes (pacotes) saem de cada tamanho. Deixe em branco o tamanho que não quer imprimir.</p>',
+    campos: tams.map((t, i) => ({ k: 't' + i, r: `${t} (${num(pecas(t))} peças) · volumes`, tipo: 'number', min: 1, step: 1 })),
+    validar: (o) => Object.values(o).some(x => x > 0) ? null : 'Informe os volumes de pelo menos um tamanho.' });
+  if (!v) return;
+  const qr = (t) => { if (!window.qrcode) return ''; const q = window.qrcode(0, 'M'); q.addData(String(t)); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
+  const html = tams.flatMap((t, i) => { const n = Math.floor(v['t' + i] || 0); return Array.from({ length: n }, (_, k) => `<div class="vol"><table>
+    <tr class="v-lote"><th>LOTE</th><td>${h(c.lote)}</td><td class="v-qr">${qr(c.lote + t)}</td></tr>
+    <tr><th>DATA CORTE</th><td colspan="2">${data(c.data)}</td></tr>
+    <tr><th>PRODUTO</th><td colspan="2" style="font-size:15pt">${h(c.produto)}</td></tr>
+    <tr><th>TAMANHO</th><td colspan="2">${h(t)}</td></tr>
+    <tr><th>VOLUME</th><td colspan="2">${k + 1}/${n}</td></tr></table></div>`); }).join('');
+  imprimirHtml(html);
 }

@@ -1,7 +1,7 @@
 import { db, tem } from '../app.js';
 import { PREVISAO_DIAS } from '../config.js';
 import { h, num, moeda, data, dataHora, chip, modal, chamar, ler, cadastros, opcoes, toast, token, hojeISO, confirmar, contem, formModal } from '../util.js';
-import { imprimirRomaneio } from '../romaneio.js';
+import { imprimirRomaneio, imprimirFolhaFaccao } from '../romaneio.js';
 
 let aba = 'separar';
 let busca = '';
@@ -114,7 +114,7 @@ async function telaEnvio(itens, depois) {
         selecionados.clear();
         toast(r.ja_processado ? 'Envio já havia sido registrado.' : `Enviado: ${num(r.qtd_total)} peças (${moeda(r.valor_total)}).`, 'ok');
         depois();
-        if (await confirmar('Romaneio', 'Imprimir o romaneio deste envio?', 'Imprimir')) imprimirRomaneio(r.remessa_id);
+        if (await confirmar('Folha da facção', 'Imprimir a folha da facção (controle de facção, 2 vias) deste envio?', 'Imprimir')) imprimirFolhaFaccao(r.remessa_id);
       }
     }]
   });
@@ -129,11 +129,12 @@ async function renderRemessas(el) {
     <div class="tabela-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Facção</th><th class="n">Itens</th><th class="n">Peças</th><th class="n">Valor</th><th>Previsão</th><th></th></tr></thead>
     <tbody>${lista.map(r => `<tr><td class="forte">${r.numero}</td><td>${dataHora(r.data)}</td><td>${h(r.faccao)}</td><td class="n">${r.itens}</td><td class="n">${num(r.qtd_total)}</td>
       <td class="n">${moeda(r.valor_total)}</td><td>${data(r.previsao)}</td>
-      <td><div class="acoes"><button class="btn peq" data-imp="${r.id}">🖨 Romaneio</button>${pode ? `<button class="btn peq" data-ed="${r.id}">Editar</button>` : ''}</div></td></tr>`).join('')
+      <td><div class="acoes"><button class="btn peq pri" data-folha="${r.id}">🖨 Folha da facção</button><button class="btn peq" data-imp="${r.id}">Romaneio</button>${pode ? `<button class="btn peq" data-ed="${r.id}">Editar</button>` : ''}</div></td></tr>`).join('')
       || '<tr><td colspan="8" class="vazio">Nenhum romaneio.</td></tr>'}</tbody></table></div>`;
   ligarAbas(el);
   el.querySelector('#busca').onchange = (e) => { busca = e.target.value; render(el); };
   el.querySelectorAll('[data-imp]').forEach(b => b.onclick = () => imprimirRomaneio(b.dataset.imp));
+  el.querySelectorAll('[data-folha]').forEach(b => b.onclick = () => imprimirFolhaFaccao(b.dataset.folha));
   el.querySelectorAll('[data-ed]').forEach(b => b.onclick = async () => {
     const r = rems.find(x => x.id === b.dataset.ed);
     const v = await formModal({ titulo: `Romaneio ${r.numero} — ${r.faccao}`, campos: [
