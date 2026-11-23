@@ -31,9 +31,17 @@ export async function imprimirRomaneio(remessaId) {
 // Folha da facção (romaneio de envio) — mesmo conteúdo da aba FOLHA_FACÇÃO da planilha ETIQUETA GMS, em layout novo:
 // uma folha por lote da remessa, grade cor × tamanho com linha de conferência, aviamentos por cor
 // (arredondar para cima: consumo da ficha técnica × peças da cor; tecido fica fora) e 2 vias (empresa e facção).
-export async function imprimirFolhaFaccao(remessaId) {
+export async function imprimirFolhaFaccao(remessaIds) {
+  // aceita um romaneio ou vários (envio de vários lotes de uma vez = um romaneio por lote, impressos juntos)
+  const ids = Array.isArray(remessaIds) ? remessaIds : [remessaIds];
+  const paginas = [];
+  for (const id of ids) paginas.push(await folhasDoRomaneio(id));
+  imprimirHtml(paginas.join(''));
+}
+
+async function folhasDoRomaneio(remessaId) {
   const [rem] = await ler(db.from('v_remessas').select('*').eq('id', remessaId));
-  if (!rem) return;
+  if (!rem) return '';
   const itens = await ler(db.from('v_envios').select('*').eq('remessa_id', remessaId));
   const [fac] = await ler(db.from('faccoes').select('maquinas,apelido,bairro').eq('id', rem.faccao_id));
   const prodIds = [...new Set(itens.map(e => e.produto_id))];
@@ -84,5 +92,5 @@ export async function imprimirFolhaFaccao(remessaId) {
     </section>`;
     return via('1ª via · Empresa') + via('2ª via · Facção');
   });
-  imprimirHtml(folhas.join(''));
+  return folhas.join('');
 }

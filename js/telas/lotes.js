@@ -128,9 +128,10 @@ async function telaEnvio(itens, depois, facPadrao = null) {
         const r = await chamar(db, 'enviar_faccao', { p_faccao_id: fac, p_itens: lista, p_token: tk, p_previsao: m.querySelector('#prev').value || null, p_aviamentos: null, p_obs: m.querySelector('#obs').value || null });
         if (!r) return false;
         selecionados.clear();
-        toast(r.ja_processado ? 'Envio já havia sido registrado.' : `Enviado: ${num(r.qtd_total)} peças.`, 'ok');
+        const nr = (r.remessa_ids || [r.remessa_id]).length;
+        toast(r.ja_processado ? 'Envio já havia sido registrado.' : `Enviado: ${num(r.qtd_total)} peças · ${nr} romaneio(s), um por lote.`, 'ok');
         depois();
-        if (await confirmar('Folha da facção', 'Imprimir a folha da facção (romaneio e aviamentos, 2 vias) deste envio?', 'Imprimir')) imprimirFolhaFaccao(r.remessa_id);
+        if (await confirmar('Folha da facção', `Imprimir ${nr > 1 ? `os ${nr} romaneios (um por lote)` : 'o romaneio'} com aviamentos, 2 vias cada?`, 'Imprimir')) imprimirFolhaFaccao(r.remessa_ids || r.remessa_id);
       }
     }]
   });
