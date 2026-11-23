@@ -8,7 +8,9 @@ let busca = '';
 
 export async function render(el) {
   const cad = await cadastros(db);
-  let q = db.from('v_cortes').select('*').order('data', { ascending: false }).limit(300);
+  // cortados: mais recente primeiro pela data em que foi cortado; a cortar: pela data de programação
+  let q = db.from('v_cortes').select('*');
+  q = (filtro === 'Programado' ? q.order('data', { ascending: false }) : q.order('cortado_em', { ascending: false, nullsFirst: false }).order('data', { ascending: false })).limit(300);
   if (filtro !== 'todos') q = q.eq('status', filtro);
   const cortes0 = await ler(q);
   const nomeProd = (id) => cad.produtos.find(p => p.id === id)?.nome;
@@ -64,7 +66,7 @@ function cartao(c, pode, sup) {
   const cores = (c.cores || []).map(x => `${h(x.cor)} <b>${x.folhas}</b>`).join(' · ');
   const tams = (c.tamanhos || []).map(x => `${h(x.tamanho)} <b>${x.riscos}</b>`).join(' · ');
   return `<div class="item">
-    <div class="linha1"><div><div class="tit">Lote ${h(c.lote)}</div><div class="det">${h(c.produto)} · ${data(c.data)}</div></div>
+    <div class="linha1"><div><div class="tit">Lote ${h(c.lote)}</div><div class="det">${h(c.produto)} · ${c.cortado_em && data(c.cortado_em) !== data(c.data) ? `programado ${data(c.data)} · <b>cortado ${data(c.cortado_em)}</b>` : data(c.cortado_em || c.data)}</div></div>
       ${chip(c.status, COR_STATUS[c.status])}</div>
     <div class="det" style="margin-top:8px">${c.faccao ? chip('Facção: ' + c.faccao, 'info') : chip('Sem facção definida', '')}</div>
     <div class="det" style="margin-top:6px">Folhas: ${cores}</div>
@@ -249,7 +251,7 @@ async function etiquetaVolume(c) {
       imprimirHtml(imprimir.flatMap(({ t, n, qtds }) => { const tm = tams.find(x => x.id === t); return Array.from({ length: n }, (_, k) => `<div class="vol"><table>
         <tr><th class="v-rot">MODELO:</th><td class="v-cod">${h(prod.cod)}</td><td class="v-qr" rowspan="2">${qr(c.lote + tm.nome)}</td></tr>
         <tr><td colspan="2" class="v-nome">${h(prod.nome_base)}</td></tr>
-        <tr><td colspan="2" class="v-data"><span>DATA:</span> ${data(c.data)}</td><td rowspan="2" class="v-tam"><small>TAMANHO</small>${h(tm.nome)}</td></tr>
+        <tr><td colspan="2" class="v-data"><span>DATA:</span> ${data(c.cortado_em || c.data)}</td><td rowspan="2" class="v-tam"><small>TAMANHO</small>${h(tm.nome)}</td></tr>
         <tr><th colspan="2" class="v-rot" style="text-align:left">LOTE:</th></tr>
         <tr><td colspan="3" class="v-lote">${h(c.lote)}</td></tr>
         <tr><td colspan="3" class="v-vol">VOLUME: <b>${k + 1}/${n}</b>${qtds ? ` · <b>${qtds[k]}</b> peças` : ''}</td></tr>
