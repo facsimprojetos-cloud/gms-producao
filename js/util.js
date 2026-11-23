@@ -142,6 +142,9 @@ export async function cadastros(db, forcar = false) {
     ler(db.from('processos').select('*').order('nome')),
     ler(db.from('motivos_parada').select('*').order('nome')),
   ]);
+  // produto aparece sempre como "código | nome" (ex.: 37 | CALCINHA TAILANDESA), em ordem de código
+  produtos.forEach(p => { p.nome_base = p.nome; p.cod = p.codigo ? String(Number(p.codigo) || p.codigo) : ''; p.nome = p.cod ? `${p.cod} | ${p.nome_base}` : p.nome_base; });
+  produtos.sort((a, b) => (Number(a.codigo) || 1e9) - (Number(b.codigo) || 1e9) || a.nome.localeCompare(b.nome, 'pt-BR'));
   cache.v = { produtos, cores, tamanhos, faccoes, operadores, clientes, processos, motivos }; cache.t = Date.now();
   return cache.v;
 }
@@ -220,4 +223,6 @@ export function formModal({ titulo, campos, botao = 'Salvar', classe = 'pri', te
 
 // Opções [id, nome] de uma lista de cadastro (só ativos, mais o valor atual)
 export const ops = (lista, atual, rot = 'nome') => lista.filter(x => x.ativo !== false || String(x.id) === String(atual)).map(x => [x.id, x[rot]]);
-export const DESTINOS = { 'ESTAMPARIA': 'Estamparia', 'FINALIZAÇÃO': 'Finalização interna', 'INSPEÇÃO': 'Inspeção', 'ESTOQUE': 'Estoque (pronto)' };
+export const DESTINOS = { 'FINALIZAÇÃO': 'Finalização interna', 'REVISÃO': 'Revisão e embalagem', 'ESTAMPARIA': 'Estamparia', 'INSPEÇÃO': 'Inspeção', 'ESTOQUE': 'Estoque (histórico)' };
+// próximos processos possíveis no retorno (GMS)
+export const PROXIMOS = ['FINALIZAÇÃO', 'REVISÃO'];

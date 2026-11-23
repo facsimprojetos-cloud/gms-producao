@@ -1,8 +1,9 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, SCHEMA, EMPRESA } from './config.js';
 // Versão publicada: muda a cada atualização para o navegador não usar telas antigas do cache
-const VERSAO = '202611231145'; // atualizar a cada publicação
+const VERSAO = '202611231530'; // atualizar a cada publicação
 import { h, toast } from './util.js';
+import { ativarBusca } from './busca.js';
 
 export const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
   db: { schema: SCHEMA },
@@ -25,6 +26,7 @@ const ROTAS = [
   { hash: '#/faccao', nome: '3 - Gestão de Facção', ico: '🧵', modulo: 'faccao' },
   { hash: '#/consertos', nome: 'Consertos', ico: '🛠️', modulo: 'consertos' },
   { grupo: 'Produção' },
+  { hash: '#/producao', nome: 'Produção interna', ico: '🏭', modulo: 'producao_interna' },
   { hash: '#/apontador', nome: 'Apontador', ico: '⏱️', modulo: 'apontador' },
   { hash: '#/prontos', nome: 'Peças prontas', ico: '✅', modulo: 'prontos' },
   { grupo: 'Estoque' },
@@ -207,4 +209,5 @@ db.auth.onAuthStateChange((evento) => {
   }
 });
 
+ativarBusca(document.body);
 iniciar();

@@ -52,7 +52,7 @@ async function lancar(alvo, el, edicao = null) {
   const { cad, horarios, roteiro, lotes } = d;
   const comRoteiro = new Set(roteiro.map(r => r.produto_id));
   const produtos = cad.produtos.filter(p => p.ativo !== false && (comRoteiro.has(p.id) || p.apelido))
-    .map(p => ({ id: p.id, nome: p.apelido || p.nome, codigo: p.codigo })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    .map(p => ({ id: p.id, nome: p.cod ? `${p.cod} | ${p.apelido || p.nome_base}` : (p.apelido || p.nome_base), codigo: p.codigo }));
   const v = edicao || { data: hojeISO(), hora: faixaAtual(horarios), ...ultimo };
   const opt = (lista, atual, rot = 'nome') => '<option value="">Selecione…</option>' + lista.map(x => `<option value="${x.id}" ${String(x.id) === String(atual ?? '') ? 'selected' : ''}>${h(x[rot])}</option>`).join('');
   alvo.innerHTML = `

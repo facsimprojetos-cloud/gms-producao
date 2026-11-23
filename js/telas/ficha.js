@@ -26,7 +26,7 @@ async function detalhe(el) {
     ler(db.from('v_custo_produto').select('*').eq('produto_id', produtoId)),
     ler(db.from('fichas_produto').select('*').eq('produto_id', produtoId)),
     ler(db.from('produto_processos').select('*, processos(nome)').eq('produto_id', produtoId).order('sequencia')),
-    ler(db.from('ficha_tecnica').select('*, materias_primas(nome, unidade, valor)').eq('produto_id', produtoId)),
+    ler(db.from('ficha_tecnica').select('*, materias_primas(nome, unidade, valor, tipo)').eq('produto_id', produtoId)),
     ler(db.from('ficha_medidas').select('*').eq('produto_id', produtoId).order('ordem').order('id')),
     ler(db.from('materias_primas').select('*').eq('ativo', true).order('nome')),
   ]);
@@ -44,7 +44,7 @@ async function detalhe(el) {
       <div class="kpi"><div class="rot">Custo total (MP + facção)</div><div class="val">${moeda(Number(custo.custo_mp) + Number(prod.valor_faccao || 0))}</div></div>
     </div>
 
-    <div class="card" style="margin-top:14px"><div class="linha1"><h2>Ficha do produto</h2>${pode ? '<button class="btn peq" id="ed-ficha">Editar</button>' : ''}</div>
+    <div class="card" style="margin-top:14px"><div class="linha1"><h2>Ficha do produto</h2>${pode ? `<div class="acoes"><label class="btn peq">📷 Foto frente<input type="file" accept="image/*" data-foto="foto_frente" hidden></label><label class="btn peq">📷 Foto costas<input type="file" accept="image/*" data-foto="foto_costas" hidden></label><button class="btn peq" id="ed-ficha">Editar</button></div>` : ''}</div>
       <div class="grade g3 peq">
         <div><b>Referência:</b> ${h(fp.referencia || '—')}</div><div><b>Criação:</b> ${h(fp.criacao || '—')}</div><div><b>Pilotagem:</b> ${h(fp.pilotagem || '—')}</div>
         <div><b>Grade:</b> ${h(fp.grade || '—')}</div><div style="grid-column:span 2"><b>Informação de corte:</b> ${h(fp.info_corte || '—')}</div>
@@ -59,9 +59,10 @@ async function detalhe(el) {
       <tfoot><tr class="grupo"><td colspan="2">Total</td><td class="n">${num(custo.tempo_seg)} s</td></tr></tfoot></table></div></div>
 
     <div class="card" style="margin-top:14px"><div class="linha1"><h2>Consumo de matéria-prima</h2>${pode ? '<button class="btn peq" id="add-mp">+ Matéria-prima</button>' : ''}</div>
-      <div class="tabela-wrap"><table><thead><tr><th>Matéria-prima</th><th>Unid.</th><th class="n">Consumo/peça</th><th class="n">Valor unit.</th><th class="n">Custo</th><th></th></tr></thead>
-      <tbody>${ft.map(x => `<tr><td>${h(x.materias_primas.nome)}</td><td>${h(x.materias_primas.unidade)}</td><td class="n">${num(x.consumo, 3)}</td><td class="n">${moeda(x.materias_primas.valor)}</td>
-        <td class="n forte">${moeda(x.consumo * x.materias_primas.valor)}</td><td>${pode ? `<div class="acoes"><button class="btn peq" data-edmp="${x.id}">Editar</button><button class="btn peq perigo" data-delmp="${x.id}">🗑</button></div>` : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="vazio">Sem itens.</td></tr>'}</tbody></table></div></div>
+      <div class="tabela-wrap"><table><thead><tr><th>Matéria-prima</th><th>Categoria</th><th>Unid.</th><th class="n">Consumo/peça</th><th class="n">Valor unit.</th><th class="n">Custo</th><th></th></tr></thead>
+      <tbody>${ft.map(x => `<tr><td>${h(x.materias_primas.nome)}</td><td>${x.materias_primas.tipo === 'TECIDO' ? chip('Tecido · sai no corte', 'acento') : chip(x.materias_primas.tipo || '', 'info')}</td><td>${h(x.materias_primas.unidade)}</td><td class="n">${num(x.consumo, 3)}</td><td class="n">${moeda(x.materias_primas.valor)}</td>
+        <td class="n forte">${moeda(x.consumo * x.materias_primas.valor)}</td><td>${pode ? `<div class="acoes"><button class="btn peq" data-edmp="${x.id}">Editar</button><button class="btn peq perigo" data-delmp="${x.id}">🗑</button></div>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="vazio">Sem itens.</td></tr>'}</tbody></table></div>
+      <p class="muted peq">Tecido: o consumo × peças cortadas sai do estoque quando o corte é confirmado. Demais categorias: saem na folha de aviamentos da facção (consumo × peças, arredondado para cima).</p></div>
 
     <div class="card" style="margin-top:14px"><div class="linha1"><h2>Tabela de medidas (cm)</h2>${pode ? '<button class="btn peq" id="add-med">+ Medida</button>' : ''}</div>
       <div class="tabela-wrap"><table><thead><tr><th>Descrição</th>${tams.map(t => `<th class="n">${h(t)}</th>`).join('')}<th></th></tr></thead>
@@ -82,9 +83,21 @@ async function detalhe(el) {
     toast('Ficha salva.', 'ok'); re();
   });
   el.querySelector('#ed-rot')?.addEventListener('click', () => editarRoteiro(cad, roteiro, re));
+  el.querySelectorAll('[data-foto]').forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    if (f.size > 5 * 1024 * 1024) return toast('Imagem maior que 5 MB.', 'erro');
+    const ext = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const caminho = `${produtoId}/${inp.dataset.foto}-${Date.now()}.${ext}`;
+    const up = await db.storage.from('gms-produtos').upload(caminho, f, { contentType: f.type });
+    if (up.error) return toast(msgErro(up.error), 'erro');
+    const url = db.storage.from('gms-produtos').getPublicUrl(caminho).data.publicUrl;
+    const { error } = await db.from('fichas_produto').upsert({ produto_id: produtoId, ...fp, [inp.dataset.foto]: url, atualizado_em: new Date().toISOString() });
+    if (error) return toast(msgErro(error), 'erro');
+    toast('Foto salva.', 'ok'); re();
+  });
   const formMp = async (x) => {
     const v = await formModal({ titulo: x ? 'Editar consumo' : 'Adicionar matéria-prima', campos: [
-      { k: 'mp', r: 'Matéria-prima', tipo: 'select', opcoes: mps.map(m => [m.id, `${m.nome} (${m.unidade} · ${moeda(m.valor)})`]), valor: x?.materia_prima_id, req: true },
+      { k: 'mp', r: 'Matéria-prima', tipo: 'select', opcoes: mps.map(m => [m.id, `${m.nome} · ${m.tipo} (${m.unidade} · ${moeda(m.valor)})`]), valor: x?.materia_prima_id, req: true },
       { k: 'consumo', r: 'Consumo por peça', tipo: 'number', min: 0.0001, valor: x?.consumo, req: true }, { k: 'obs', r: 'Observação', valor: x?.obs }] });
     if (!v) return;
     const dados = { produto_id: produtoId, materia_prima_id: +v.mp, consumo: v.consumo, obs: v.obs };
@@ -131,12 +144,26 @@ function editarRoteiro(cad, roteiro, depois) {
     corpo: `<p class="muted">Digite o nome da operação (escolha da lista ou crie uma nova) e o tempo padrão em <b>segundos por peça</b>. A ordem das linhas é a sequência.</p>
       <datalist id="lista-proc">${cad.processos.filter(p => p.ativo).map(p => `<option value="${h(p.nome)}">`).join('')}</datalist>
       <div class="tabela-wrap"><table><thead><tr><th></th><th>Operação</th><th>Tempo (s)</th><th></th></tr></thead><tbody id="rot">${(roteiro.length ? roteiro : [{}]).map(r => linhaRot(cad, r)).join('')}</tbody></table></div>
-      <button type="button" class="btn peq" id="add" style="margin-top:8px">+ Operação</button> <span class="forte" id="tot" style="margin-left:10px"></span>`,
+      <button type="button" class="btn peq" id="add" style="margin-top:8px">+ Linha</button> <button type="button" class="btn peq" id="nova" style="margin-top:8px">+ Nova operação</button> <span class="forte" id="tot" style="margin-left:10px"></span>`,
     aoAbrir: (m) => {
       const tb = m.querySelector('#rot');
       const tot = () => { const s = [...tb.querySelectorAll('[data-c=tempo]')].reduce((a, i) => a + (+i.value || 0), 0); m.querySelector('#tot').textContent = `Total: ${num(s)} s (${num(s / 60, 1)} min)`; };
       m.addEventListener('input', tot); tot();
       m.querySelector('#add').onclick = () => tb.insertAdjacentHTML('beforeend', linhaRot(cad));
+      m.querySelector('#nova').onclick = async () => {
+        const v = await formModal({ titulo: 'Nova operação', botao: 'Adicionar ao roteiro', campos: [{ k: 'nome', r: 'Nome da operação', req: true }, { k: 'tempo', r: 'Tempo padrão (segundos por peça)', tipo: 'number', min: 0 }] });
+        if (!v) return;
+        const nome = v.nome.toUpperCase();
+        if (!cad.processos.some(p => p.nome.toUpperCase() === nome)) {
+          const { data: novo, error } = await db.from('processos').insert({ nome }).select().single();
+          if (error) return toast(msgErro(error), 'erro');
+          cad.processos.push(novo); m.querySelector('#lista-proc').insertAdjacentHTML('beforeend', `<option value="${h(nome)}">`); limparCache();
+        }
+        const vazia = [...tb.querySelectorAll('[data-c=proc]')].find(i => !i.value.trim());
+        if (vazia) { vazia.value = nome; vazia.closest('tr').querySelector('[data-c=tempo]').value = v.tempo ?? ''; }
+        else tb.insertAdjacentHTML('beforeend', linhaRot(cad, { nome, tempo_seg: v.tempo ?? '' }));
+        tot(); toast(`Operação ${nome} adicionada.`, 'ok');
+      };
       m.addEventListener('click', (e) => {
         const tr = e.target.closest('tr');
         if (e.target.matches('[data-rm]') && tb.children.length > 1) { tr.remove(); tot(); }
@@ -164,7 +191,7 @@ function imprimirFicha(prod, fp, roteiro, ft, medidas, tams, custo) {
     <div style="display:flex;gap:6mm">${[fp.foto_frente, fp.foto_costas].filter(Boolean).map(u => `<img src="${h(u)}" style="max-height:60mm">`).join('')}</div>
     <h3>Roteiro</h3><table><thead><tr><th>#</th><th>Operação</th><th>Tempo (s)</th></tr></thead><tbody>${roteiro.map(r => `<tr><td>${r.sequencia}</td><td>${h(r.processos?.nome)}</td><td style="text-align:right">${num(r.tempo_seg)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><th colspan="2" style="text-align:right">Total</th><th style="text-align:right">${num(custo.tempo_seg)} s</th></tr></tfoot></table>
-    <h3>Matéria-prima</h3><table><thead><tr><th>Item</th><th>Unid.</th><th>Consumo</th><th>Valor</th><th>Custo</th></tr></thead><tbody>${ft.map(x => `<tr><td>${h(x.materias_primas.nome)}</td><td>${h(x.materias_primas.unidade)}</td>
+    <h3>Matéria-prima</h3><table><thead><tr><th>Item</th><th>Unid.</th><th>Consumo</th><th>Valor</th><th>Custo</th></tr></thead><tbody>${ft.map(x => `<tr><td>${h(x.materias_primas.nome)}</td><td>${x.materias_primas.tipo === 'TECIDO' ? chip('Tecido · sai no corte', 'acento') : chip(x.materias_primas.tipo || '', 'info')}</td><td>${h(x.materias_primas.unidade)}</td>
       <td style="text-align:right">${num(x.consumo, 3)}</td><td style="text-align:right">${moeda(x.materias_primas.valor)}</td><td style="text-align:right">${moeda(x.consumo * x.materias_primas.valor)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><th colspan="4" style="text-align:right">Custo MP</th><th style="text-align:right">${moeda(custo.custo_mp)}</th></tr></tfoot></table>
     ${medidas.length ? `<h3>Medidas (cm)</h3><table><thead><tr><th>Descrição</th>${tams.map(t => `<th>${h(t)}</th>`).join('')}</tr></thead><tbody>${medidas.map(m => `<tr><td>${h(m.descricao)}</td>${tams.map(t => `<td style="text-align:right">${h(m.medidas?.[t] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}

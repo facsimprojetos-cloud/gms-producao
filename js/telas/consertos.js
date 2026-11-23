@@ -1,6 +1,5 @@
 import { db, tem } from '../app.js';
-import { h, num, moeda, data, chip, modal, chamar, ler, toast, confirmar, contem, DESTINOS } from '../util.js';
-import { destinoPadrao } from './faccao.js';
+import { h, num, moeda, data, chip, modal, chamar, ler, toast, confirmar, contem, DESTINOS, PROXIMOS } from '../util.js';
 
 let aba = 'pendentes';
 let busca = '';
@@ -37,14 +36,13 @@ export async function render(el) {
   });
   el.querySelectorAll('[data-rec]').forEach(b => b.onclick = async () => {
     const c = lista.find(x => x.id === b.dataset.rec);
-    const { data: prod } = await db.from('produtos').select('estamparia_apos').eq('id', c.produto_id).single();
     modal({
       titulo: 'Conserto recebido',
       corpo: `<p><b>${num(c.qtd)}</b> peça(s) de <b>${h(c.produto)}</b> ${h(c.cor)} ${h(c.tamanho)} — ${h(c.faccao)}</p>
         <form id="fc" class="grade g3">
           <label class="campo">Consertadas<input type="number" name="ok" min="0" max="${c.qtd}" value="${c.qtd}"></label>
           <label class="campo">Perdidas<input type="number" name="perda" min="0" max="${c.qtd}" value="0"></label>
-          <label class="campo">Próximo processo<select name="prox">${Object.entries(DESTINOS).map(([k, r]) => `<option value="${k}" ${k === (c.origem === 'RETORNO' ? destinoPadrao(prod) : 'INSPEÇÃO') ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
+          <label class="campo">Próximo processo<select name="prox">${PROXIMOS.map(k => `<option value="${k}">${DESTINOS[k]}</option>`).join('')}</select></label>
         </form>`,
       botoes: [{ texto: 'Cancelar' }, { texto: 'Confirmar recebimento', classe: 'pri', acao: async (m) => {
         const f = m.querySelector('#fc'), ok = +f.ok.value || 0, perda = +f.perda.value || 0;

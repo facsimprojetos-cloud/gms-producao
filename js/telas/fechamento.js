@@ -2,56 +2,55 @@ import { db, tem } from '../app.js';
 import { EMPRESA } from '../config.js';
 import { h, num, moeda, data, chip, modal, chamar, ler, cadastros, opcoes, toast, hojeISO, confirmar, pedirTexto, imprimirHtml } from '../util.js';
 
+// Fechamento da facção: tudo o que retornou (lançado no app) entra aqui. O valor por peça é definido no fechamento.
+// Valor = (peças boas + consertos) × valor por peça. Conserto é pago junto com o lote; defeito é descontado (não pago).
 let aba = 'abertos';
 let fFac = '';
-const marcados = new Set();   // 'r:<id>' retorno · 'c:<id>' conserto
+const marcados = new Set();
+const valores = new Map(); // retorno_id -> valor por peça digitado
 
 export async function render(el) {
   const pode = tem('financeiro');
   const cad = await cadastros(db);
   el.innerHTML = `
-    <div class="cab"><div><h1>Fechamento de Facção</h1><p>Retorno = peças boas × valor por peça. Conserto de retorno é pago quando volta consertado.</p></div></div>
+    <div class="cab"><div><h1>Fechamento de Facção</h1><p>Valor = (peças boas + consertos) × valor por peça. Peças com defeito são descontadas.</p></div></div>
     <div class="abas">
       <button data-a="abertos" class="${aba === 'abertos' ? 'ativo' : ''}">A pagar</button>
       <button data-a="pagos" class="${aba === 'pagos' ? 'ativo' : ''}">Pagamentos realizados</button>
     </div>
-    <div class="filtros"><label class="campo">Facção<select id="ff">${opcoes(cad.faccoes, fFac, 'nome', 'id', aba === 'abertos' ? 'Todas (resumo)' : 'Todas')}</select></label></div>
+    <div class="filtros"><label class="campo">Facção<select id="ff">${opcoes(cad.faccoes.filter(f => !f.interna), fFac, 'nome', 'id', aba === 'abertos' ? 'Todas (resumo)' : 'Todas')}</select></label></div>
     <div id="alvo"></div>`;
   el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { aba = b.dataset.a; marcados.clear(); render(el); });
   el.querySelector('#ff').onchange = (e) => { fFac = e.target.value; marcados.clear(); render(el); };
   const alvo = el.querySelector('#alvo');
   if (aba === 'pagos') return renderPagos(alvo, el);
 
-  let qr = db.from('v_retornos').select('*').eq('pago', false).gt('valor_a_pagar', 0).order('data_retorno');
-  let qc = db.from('v_consertos').select('*').eq('pago', false).not('recebido_em', 'is', null).gt('valor_a_pagar', 0).order('recebido_em');
-  if (fFac) { qr = qr.eq('faccao_id', +fFac); qc = qc.eq('faccao_id', +fFac); }
-  const [rets, cons] = await Promise.all([ler(qr), ler(qc)]);
+  let qr = db.from('v_retornos').select('*').eq('pago', false).eq('historico', false).eq('interna', false).order('data_retorno');
+  if (fFac) qr = qr.eq('faccao_id', +fFac);
+  const rets = await ler(qr);
 
   if (!fFac) {
     const porFac = new Map();
-    const pega = (id, nome) => { if (!porFac.has(id)) porFac.set(id, { nome, n: 0, v: 0 }); return porFac.get(id); };
-    rets.forEach(r => { const x = pega(r.faccao_id, r.faccao); x.n++; x.v += Number(r.valor_a_pagar); });
-    cons.forEach(c => { const x = pega(c.faccao_id, c.faccao); x.n++; x.v += Number(c.valor_a_pagar); });
-    alvo.innerHTML = `<div class="lista-cards">${[...porFac.entries()].sort((a, b) => b[1].v - a[1].v).map(([id, x]) => `<div class="item"><div class="tit">${h(x.nome)}</div>
-      <div class="det">${x.n} lançamento(s)</div><div style="font-size:1.4rem;font-weight:900;margin:6px 0">${moeda(x.v)}</div>
-      <button class="btn pri peq" data-fac="${id}">Abrir</button></div>`).join('') || '<div class="vazio">Nada a pagar.</div>'}</div>`;
+    rets.forEach(r => { if (!porFac.has(r.faccao_id)) porFac.set(r.faccao_id, { nome: r.faccao, n: 0, p: 0 }); const x = porFac.get(r.faccao_id); x.n++; x.p += r.qtd_paga; });
+    alvo.innerHTML = `<div class="lista-cards">${[...porFac.entries()].sort((a, b) => b[1].p - a[1].p).map(([id, x]) => `<div class="item"><div class="tit">${h(x.nome)}</div>
+      <div class="det">${x.n} retorno(s)</div><div style="font-size:1.4rem;font-weight:900;margin:6px 0">${num(x.p)} peças</div>
+      <button class="btn pri peq" data-fac="${id}">Abrir</button></div>`).join('') || '<div class="vazio">Nenhum retorno a pagar.</div>'}</div>`;
     alvo.querySelectorAll('[data-fac]').forEach(b => b.onclick = () => { fFac = b.dataset.fac; render(el); });
     return;
   }
 
-  const emConserto = await ler(db.from('v_consertos').select('qtd').eq('faccao_id', +fFac).is('recebido_em', null).eq('origem', 'RETORNO'));
-  const valorDe = (k) => k.startsWith('r:') ? Number(rets.find(r => 'r:' + r.id === k)?.valor_a_pagar || 0) : Number(cons.find(c => 'c:' + c.id === k)?.valor_a_pagar || 0);
-  const total = () => [...marcados].reduce((a, k) => a + valorDe(k), 0);
-  const ck = (k) => pode ? `<td><input type="checkbox" data-m="${k}" ${marcados.has(k) ? 'checked' : ''}></td>` : '';
+  const vu = (r) => valores.has(r.id) ? valores.get(r.id) : (r.valor_faccao ?? '');
+  const total = () => rets.filter(r => marcados.has(r.id)).reduce((a, r) => a + r.qtd_paga * (+vu(r) || 0), 0);
   alvo.innerHTML = `
-    ${emConserto.length ? `<div class="aviso-box">Esta facção ainda tem <b>${num(emConserto.reduce((a, c) => a + c.qtd, 0))}</b> peça(s) em conserto, que serão pagas quando voltarem.</div>` : ''}
-    <div class="tabela-wrap"><table><thead><tr>${pode ? '<th><input type="checkbox" id="todos"></th>' : ''}<th>Tipo</th><th>Data</th><th>Sublote</th><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Peças</th><th class="n">R$ peça</th><th class="n">Valor</th></tr></thead>
-    <tbody>${rets.map(r => `<tr>${ck('r:' + r.id)}<td>${chip('Retorno', 'info')}</td><td>${data(r.data_retorno)}</td><td>${h(r.lote)}</td><td>${h(r.produto)}</td><td>${h(r.cor)}</td><td>${h(r.tamanho)}</td>
-        <td class="n">${num(r.qtd)}</td><td class="n">${moeda(r.valor_unit)}</td><td class="n forte">${moeda(r.valor_a_pagar)}</td></tr>`).join('')}
-      ${cons.map(c => `<tr>${ck('c:' + c.id)}<td>${chip('Conserto', 'alerta')}</td><td>${data(c.recebido_em)}</td><td>${h(c.sublote)}</td><td>${h(c.produto)}</td><td>${h(c.cor)}</td><td>${h(c.tamanho)}</td>
-        <td class="n">${num(c.qtd_recebida)}</td><td class="n">${moeda(c.valor_unit)}</td><td class="n forte">${moeda(c.valor_a_pagar)}</td></tr>`).join('')}
-      ${rets.length + cons.length ? '' : '<tr><td colspan="10" class="vazio">Nada a pagar para esta facção.</td></tr>'}</tbody></table></div>
-    ${pode && rets.length + cons.length ? `<div class="card" style="margin-top:12px"><div class="grade g4">
+    <div class="tabela-wrap"><table><thead><tr>${pode ? '<th><input type="checkbox" id="todos"></th>' : ''}<th>Retorno</th><th>Sublote</th><th>Produto</th><th>Cor</th><th>Tam.</th>
+      <th class="n">Boas</th><th class="n">Consertos</th><th class="n">Defeito</th><th class="n">A pagar</th><th class="n">R$ por peça</th><th class="n">Valor total</th></tr></thead>
+    <tbody>${rets.map(r => `<tr>${pode ? `<td><input type="checkbox" data-m="${r.id}" ${marcados.has(r.id) ? 'checked' : ''}></td>` : ''}
+        <td>${data(r.data_retorno)}</td><td>${h(r.lote)}</td><td>${h(cad.produtos.find(p => p.id === r.produto_id)?.nome || r.produto)}</td><td>${h(r.cor)}</td><td>${h(r.tamanho)}</td>
+        <td class="n">${num(r.qtd)}</td><td class="n">${num(r.qtd_conserto)}</td><td class="n">${r.qtd_defeito ? chip(num(r.qtd_defeito), 'erro') : 0}</td><td class="n forte">${num(r.qtd_paga)}</td>
+        <td class="n">${pode ? `<input class="inp num" type="number" min="0" step="0.01" data-v="${r.id}" value="${vu(r)}">` : moeda(vu(r))}</td>
+        <td class="n forte" data-t="${r.id}">${moeda(r.qtd_paga * (+vu(r) || 0))}</td></tr>`).join('')
+      || '<tr><td colspan="12" class="vazio">Nada a pagar para esta facção.</td></tr>'}</tbody></table></div>
+    ${pode && rets.length ? `<div class="card" style="margin-top:12px"><div class="grade g4">
       <label class="campo">Selecionado<input id="tsel" readonly></label>
       <label class="campo">Desconto (R$)<input type="number" id="desc" min="0" step="0.01" value="0"></label>
       <label class="campo">Data do pagamento<input type="date" id="dt" value="${hojeISO()}"></label>
@@ -60,23 +59,28 @@ export async function render(el) {
   const atualizar = () => {
     if (!pode) return;
     const t = total(), d = +(alvo.querySelector('#desc')?.value || 0);
-    const ts = alvo.querySelector('#tsel'); if (ts) ts.value = `${marcados.size} item(ns) · ${moeda(t)}`;
+    const ts = alvo.querySelector('#tsel'); if (ts) ts.value = `${marcados.size} retorno(s) · ${moeda(t)}`;
     const tl = alvo.querySelector('#tliq'); if (tl) tl.textContent = `Total a pagar: ${moeda(Math.max(0, t - d))}`;
   };
   alvo.querySelectorAll('[data-m]').forEach(cb => cb.onchange = () => { cb.checked ? marcados.add(cb.dataset.m) : marcados.delete(cb.dataset.m); atualizar(); });
+  alvo.querySelectorAll('[data-v]').forEach(i => i.oninput = () => {
+    valores.set(i.dataset.v, i.value); const r = rets.find(x => x.id === i.dataset.v);
+    alvo.querySelector(`[data-t="${i.dataset.v}"]`).textContent = moeda(r.qtd_paga * (+i.value || 0)); atualizar();
+  });
   alvo.querySelector('#todos')?.addEventListener('change', (e) => { alvo.querySelectorAll('[data-m]').forEach(cb => { cb.checked = e.target.checked; e.target.checked ? marcados.add(cb.dataset.m) : marcados.delete(cb.dataset.m); }); atualizar(); });
   alvo.querySelector('#desc')?.addEventListener('input', atualizar);
   atualizar();
   alvo.querySelector('#pagar')?.addEventListener('click', async () => {
-    if (!marcados.size) return toast('Selecione os itens.', 'erro');
+    if (!marcados.size) return toast('Selecione os retornos.', 'erro');
+    const itens = rets.filter(r => marcados.has(r.id)).map(r => ({ retorno_id: r.id, valor_unit: vu(r) === '' ? null : +vu(r) }));
+    if (itens.some(i => i.valor_unit == null || i.valor_unit < 0)) return toast('Informe o valor por peça de todos os retornos selecionados.', 'erro');
     const d = +(alvo.querySelector('#desc').value || 0), t = total();
     if (d < 0 || d > t) return toast('Desconto inválido.', 'erro');
     const nome = cad.faccoes.find(f => String(f.id) === fFac)?.nome;
     if (!await confirmar('Registrar pagamento', `Pagar <b>${moeda(t - d)}</b> para <b>${h(nome)}</b>?`, 'Registrar')) return;
-    const r = await chamar(db, 'registrar_fechamento', { p_faccao_id: +fFac, p_retornos: [...marcados].filter(k => k.startsWith('r:')).map(k => k.slice(2)),
-      p_consertos: [...marcados].filter(k => k.startsWith('c:')).map(k => k.slice(2)), p_desconto: d, p_data: alvo.querySelector('#dt').value || null, p_obs: alvo.querySelector('#obs').value || null });
+    const r = await chamar(db, 'registrar_fechamento', { p_faccao_id: +fFac, p_itens: itens, p_desconto: d, p_data: alvo.querySelector('#dt').value || null, p_obs: alvo.querySelector('#obs').value || null });
     if (!r) return;
-    marcados.clear(); toast('Pagamento registrado.', 'ok');
+    marcados.clear(); itens.forEach(i => valores.delete(i.retorno_id)); toast('Pagamento registrado.', 'ok');
     if (await confirmar('Recibo', 'Imprimir o recibo deste pagamento?', 'Imprimir')) recibo(r);
     render(el);
   });

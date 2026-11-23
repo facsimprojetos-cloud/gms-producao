@@ -10,18 +10,21 @@ export async function render(el) {
   const cad = await cadastros(db);
   let q = db.from('v_cortes').select('*').order('data', { ascending: false }).limit(300);
   if (filtro !== 'todos') q = q.eq('status', filtro);
-  const cortes = (await ler(q)).filter(c => contem(c, ['lote', 'produto', 'pedido_numero'], busca));
+  const cortes0 = await ler(q);
+  const nomeProd = (id) => cad.produtos.find(p => p.id === id)?.nome;
+  cortes0.forEach(c => { c.faccao = c.faccao || ''; c.produto = nomeProd(c.produto_id) || c.produto; });
+  const cortes = cortes0.filter(c => contem(c, ['lote', 'produto', 'faccao'], busca));
   const pode = tem('corte');
   const sup = tem('supervisor');
 
   el.innerHTML = `
     <div class="cab"><div><h1>1 - Corte</h1><p>Programe o corte (cores × folhas, tamanhos × riscos). Ao confirmar, cada cor × tamanho vira um sublote e cada risco uma etiqueta.</p></div>
-      ${pode ? '<button class="btn acento" id="novo">+ Novo pedido de corte</button>' : ''}</div>
+      ${pode ? '<button class="btn acento" id="novo">+ Novo corte</button>' : ''}</div>
     <div class="abas">
       ${[['Programado', 'A cortar'], ['Cortado', 'Cortados'], ['Cancelado', 'Cancelados'], ['todos', 'Todos']].map(([k, r]) => `<button data-f="${k}" class="${filtro === k ? 'ativo' : ''}">${r}</button>`).join('')}
     </div>
-    <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Lote, produto, pedido…"></label></div>
-    <div class="lista-cards">${cortes.map(c => cartao(c, pode, sup)).join('') || '<div class="vazio">Nenhum pedido de corte.</div>'}</div>`;
+    <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Lote, produto, facção…"></label></div>
+    <div class="lista-cards">${cortes.map(c => cartao(c, pode, sup)).join('') || '<div class="vazio">Nenhum corte.</div>'}</div>`;
 
   el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; render(el); });
   el.querySelector('#busca').onchange = (e) => { busca = e.target.value; render(el); };
@@ -30,7 +33,11 @@ export async function render(el) {
     const c = cortes.find(x => x.id === b.dataset.id);
     const ac = b.dataset.acao;
     if (ac === 'editar') formCorte(cad, c, () => render(el));
-    if (ac === 'duplicar') formCorte(cad, { ...c, id: null, pedido_id: null }, () => render(el));
+    if (ac === 'duplicar') formCorte(cad, { ...c, id: null }, () => render(el));
+    if (ac === 'faccao') {
+      const v = await formModal({ titulo: `Facção do lote ${c.lote}`, botao: 'Salvar', campos: [{ k: 'f', r: 'Facção', tipo: 'select', vazio: 'Sem facção (aguardando distribuição)', valor: c.faccao_id, opcoes: cad.faccoes.filter(f => f.ativo).map(f => [f.id, f.nome]) }] });
+      if (v && await chamar(db, 'definir_faccao_corte', { p_corte_id: c.id, p_faccao_id: v.f ? +v.f : null })) { toast('Facção definida.', 'ok'); render(el); }
+    }
     if (ac === 'confirmar') telaConfirmar(c, () => render(el));
     if (ac === 'sublotes') verSublotes(c);
     if (ac === 'volumes') return etiquetaVolume(c);
@@ -57,9 +64,9 @@ function cartao(c, pode, sup) {
   const cores = (c.cores || []).map(x => `${h(x.cor)} <b>${x.folhas}</b>`).join(' · ');
   const tams = (c.tamanhos || []).map(x => `${h(x.tamanho)} <b>${x.riscos}</b>`).join(' · ');
   return `<div class="item">
-    <div class="linha1"><div><div class="tit">Lote ${h(c.lote)}</div><div class="det">${h(c.produto)} · ${data(c.data)}${c.pedido_numero ? ` · Pedido ${c.pedido_numero}` : ''}</div></div>
+    <div class="linha1"><div><div class="tit">Lote ${h(c.lote)}</div><div class="det">${h(c.produto)} · ${data(c.data)}</div></div>
       ${chip(c.status, COR_STATUS[c.status])}</div>
-    <div class="det" style="margin-top:8px">${chip(c.destino === 'ESTAMPARIA' ? 'Estampar antes de costurar' : 'Direto para produção', c.destino === 'ESTAMPARIA' ? 'acento' : 'info')}</div>
+    <div class="det" style="margin-top:8px">${c.faccao ? chip('Facção: ' + c.faccao, 'info') : chip('Sem facção definida', '')}</div>
     <div class="det" style="margin-top:6px">Folhas: ${cores}</div>
     <div class="det">Riscos: ${tams}</div>
     <div class="det">Total: <b>${num(c.total_pecas)}</b> peças</div>
@@ -67,7 +74,7 @@ function cartao(c, pode, sup) {
     <div class="acoes" style="margin-top:10px">
       ${pode && c.status === 'Programado' ? `<button class="btn pri peq" data-acao="confirmar" data-id="${c.id}">✂️ Cortar</button>` : ''}
       ${pode && c.status === 'Programado' ? `<button class="btn peq" data-acao="editar" data-id="${c.id}">Editar</button>` : ''}
-      ${c.status === 'Cortado' ? `<button class="btn peq" data-acao="volumes" data-id="${c.id}">📦 Etiqueta de volume</button><button class="btn peq" data-acao="etiquetas" data-id="${c.id}">🏷️ Etiquetas</button><button class="btn peq" data-acao="sublotes" data-id="${c.id}">Sublotes</button>` : ''}
+      ${c.status === 'Cortado' ? `<button class="btn peq" data-acao="volumes" data-id="${c.id}">📦 Etiqueta de volume</button><button class="btn peq" data-acao="etiquetas" data-id="${c.id}">🏷️ Etiquetas</button><button class="btn peq" data-acao="sublotes" data-id="${c.id}">Sublotes</button>${pode ? `<button class="btn peq" data-acao="faccao" data-id="${c.id}">Facção</button>` : ''}` : ''}
       ${pode ? `<button class="btn peq" data-acao="duplicar" data-id="${c.id}">Duplicar</button>` : ''}
       ${pode && c.status === 'Programado' ? `<button class="btn peq perigo" data-acao="cancelar" data-id="${c.id}">Cancelar</button>` : ''}
       ${sup && c.status === 'Cortado' ? `<button class="btn peq perigo" data-acao="estornar" data-id="${c.id}">↩ Estornar</button>` : ''}
@@ -98,16 +105,13 @@ function linhaTam(cad, v = {}) {
 
 export async function formCorte(cad, c, depois) {
   const editar = !!(c && c.id);
-  const pedidos = await ler(db.from('v_pedidos').select('id,numero,cliente').eq('status', 'Aberto').order('numero', { ascending: false }));
   const corpo = `
     <form id="fc" class="grade">
-      <div class="grade g3">
+      <div class="grade g2">
         <label class="campo">Produto<select name="produto" required>${opcoes(cad.produtos.filter(p => p.ativo || p.id === c?.produto_id), c?.produto_id)}</select></label>
-        <label class="campo">Destino após o corte<select name="destino">
-          <option value="PRODUÇÃO" ${c?.destino !== 'ESTAMPARIA' ? 'selected' : ''}>Direto para produção</option>
-          <option value="ESTAMPARIA" ${c?.destino === 'ESTAMPARIA' ? 'selected' : ''}>Estampar antes de costurar</option></select></label>
-        <label class="campo">Pedido (opcional)<select name="pedido">${opcoes(pedidos.map(p => ({ id: p.id, nome: `${p.numero} · ${p.cliente}` })), c?.pedido_id, 'nome', 'id', 'Sem pedido (estoque)')}</select></label>
+        <label class="campo">Facção (opcional)<select name="faccao">${opcoes(cad.faccoes.filter(f => f.ativo || f.id === c?.faccao_id), c?.faccao_id, 'nome', 'id', 'Sem facção (definir depois)')}</select></label>
       </div>
+      <p class="muted peq">${editar ? '' : 'O número do lote é dado na hora de salvar, seguindo a sequência do mês (ex.: 78-11 2026). '}Com facção escolhida, depois do corte o lote vai direto para <b>Aguardando envio</b>; sem facção, fica em <b>Aguardando distribuição</b>.</p>
       <div class="grade g2">
         <div><h3>Cores e folhas</h3><div class="grade-corte" id="cores">${(c?.cores?.length ? c.cores : [{}]).map(v => linhaCor(cad, v)).join('')}</div>
           <button type="button" class="btn peq" id="add-cor" style="margin-top:6px">+ Cor</button></div>
@@ -118,7 +122,7 @@ export async function formCorte(cad, c, depois) {
       <div class="ok-box" id="total"></div>
     </form>`;
   modal({
-    titulo: editar ? `Editar lote ${c.lote}` : 'Novo pedido de corte', corpo, largo: true,
+    titulo: editar ? `Editar lote ${c.lote}` : 'Novo corte (a cortar)', corpo, largo: true,
     aoAbrir: (m) => {
       const atualizar = () => {
         const f = [...m.querySelectorAll('[name=folhas]')].reduce((a, i) => a + (+i.value || 0), 0);
@@ -132,17 +136,17 @@ export async function formCorte(cad, c, depois) {
       atualizar();
     },
     botoes: [{ texto: 'Cancelar' }, {
-      texto: editar ? 'Salvar' : 'Criar pedido de corte', classe: 'pri', acao: async (m) => {
+      texto: editar ? 'Salvar' : 'Criar corte', classe: 'pri', acao: async (m) => {
         const f = m.querySelector('#fc');
         if (!f.reportValidity()) return false;
         const cores = [...m.querySelectorAll('#cores > div')].map(d => ({ cor_id: +d.querySelector('[name=cor]').value, folhas: +d.querySelector('[name=folhas]').value }));
         const tamanhos = [...m.querySelectorAll('#tams > div')].map(d => ({ tamanho_id: +d.querySelector('[name=tam]').value, riscos: +d.querySelector('[name=riscos]').value }));
         if (cores.some(x => !x.cor_id) || tamanhos.some(x => !x.tamanho_id)) { toast('Selecione todas as cores e tamanhos.', 'erro'); return false; }
         if (new Set(cores.map(x => x.cor_id)).size !== cores.length || new Set(tamanhos.map(x => x.tamanho_id)).size !== tamanhos.length) { toast('Cor ou tamanho repetido.', 'erro'); return false; }
-        const base = { p_produto_id: +f.produto.value, p_destino: f.destino.value, p_cores: cores, p_tamanhos: tamanhos, p_pedido_id: f.pedido.value || null, p_obs: f.obs.value || null };
+        const base = { p_produto_id: +f.produto.value, p_cores: cores, p_tamanhos: tamanhos, p_faccao_id: f.faccao.value ? +f.faccao.value : null, p_obs: f.obs.value || null };
         const r = editar ? await chamar(db, 'editar_corte', { p_corte_id: c.id, ...base }) : await chamar(db, 'criar_corte', base);
         if (!r) return false;
-        toast(editar ? 'Pedido de corte atualizado.' : 'Pedido de corte criado.', 'ok'); depois();
+        toast(editar ? 'Pedido de corte atualizado.' : `Lote ${r.lote} criado.`, 'ok'); depois();
       }
     }]
   });
@@ -153,7 +157,7 @@ function telaConfirmar(c, depois) {
   for (const t of c.tamanhos) for (const cor of c.cores) linhas.push({ cor, t });
   const corpo = `
     <p>Confira as folhas e os riscos reais antes de confirmar. Cada cor × tamanho vira um sublote; cada risco vira uma etiqueta.
-      ${c.destino === 'ESTAMPARIA' ? '<br><b>Este lote vai primeiro para a estamparia.</b>' : ''}</p>
+</p>
     <div class="grade g2">
       <div><h3>Folhas por cor</h3>${c.cores.map(x => `<label class="campo">${h(x.cor)}<input type="number" min="1" step="1" data-cor="${x.posicao}" value="${x.folhas}"></label>`).join('')}</div>
       <div><h3>Riscos por tamanho</h3>${c.tamanhos.map(x => `<label class="campo">${h(x.tamanho)}<input type="number" min="1" step="1" data-tam="${x.posicao}" value="${x.riscos}"></label>`).join('')}</div>
@@ -189,24 +193,66 @@ function telaConfirmar(c, depois) {
   });
 }
 
-// Etiqueta de volume no modelo da planilha ETIQUETA GMS (aba ETIQUETA_CORTE): lote, data do corte, produto,
-// tamanho e volume n/N; QR = lote + tamanho. Os volumes de cada tamanho são informados na hora.
+// Etiqueta de volume no modelo da GMS (modelo, nome, data, tamanho, lote, volume n/N, QR = lote + tamanho, cores do lote).
+// Duas formas: só etiquetas (o tamanho saiu em N sacos) ou dividir o lote e registrar a quantidade de cada volume.
 async function etiquetaVolume(c) {
-  const subs = await ler(db.from('v_sublotes').select('tamanho,tamanho_ordem,qtd_cortada').eq('corte_id', c.id));
-  const tams = [...new Map(subs.map(s => [s.tamanho, s.tamanho_ordem ?? 0])).entries()].sort((a, b) => a[1] - b[1]).map(x => x[0]);
+  const [subs, vols, cad] = await Promise.all([
+    ler(db.from('v_sublotes').select('tamanho_id,tamanho,tamanho_ordem,cor,qtd_cortada').eq('corte_id', c.id)),
+    ler(db.from('corte_volumes').select('*').eq('corte_id', c.id).order('numero')),
+    cadastros(db)]);
+  const tams = [...new Map(subs.map(s => [s.tamanho_id, { id: s.tamanho_id, nome: s.tamanho, ordem: s.tamanho_ordem ?? 0 }])).values()].sort((a, b) => a.ordem - b.ordem);
   if (!tams.length) return toast('Este corte não tem sublotes.', 'erro');
-  const pecas = (t) => subs.filter(s => s.tamanho === t).reduce((a, s) => a + Number(s.qtd_cortada || 0), 0);
-  const v = await formModal({ titulo: `Etiqueta de volume · lote ${c.lote}`, botao: 'Imprimir',
-    texto: '<p class="peq muted">Informe quantos volumes (pacotes) saem de cada tamanho. Deixe em branco o tamanho que não quer imprimir.</p>',
-    campos: tams.map((t, i) => ({ k: 't' + i, r: `${t} (${num(pecas(t))} peças) · volumes`, tipo: 'number', min: 1, step: 1 })),
-    validar: (o) => Object.values(o).some(x => x > 0) ? null : 'Informe os volumes de pelo menos um tamanho.' });
-  if (!v) return;
-  const qr = (t) => { if (!window.qrcode) return ''; const q = window.qrcode(0, 'M'); q.addData(String(t)); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
-  const html = tams.flatMap((t, i) => { const n = Math.floor(v['t' + i] || 0); return Array.from({ length: n }, (_, k) => `<div class="vol"><table>
-    <tr class="v-lote"><th>LOTE</th><td>${h(c.lote)}</td><td class="v-qr">${qr(c.lote + t)}</td></tr>
-    <tr><th>DATA CORTE</th><td colspan="2">${data(c.data)}</td></tr>
-    <tr><th>PRODUTO</th><td colspan="2" style="font-size:15pt">${h(c.produto)}</td></tr>
-    <tr><th>TAMANHO</th><td colspan="2">${h(t)}</td></tr>
-    <tr><th>VOLUME</th><td colspan="2">${k + 1}/${n}</td></tr></table></div>`); }).join('');
-  imprimirHtml(html);
+  const pecas = (t) => subs.filter(s => s.tamanho_id === t).reduce((a, s) => a + Number(s.qtd_cortada || 0), 0);
+  const cores = (t) => [...new Set(subs.filter(s => s.tamanho_id === t).map(s => String(s.cor).toUpperCase()))];
+  const reg = (t) => vols.filter(v => v.tamanho_id === t).map(v => v.qtd);
+  const prod = cad.produtos.find(p => p.id === c.produto_id) || { cod: '', nome_base: c.produto };
+  const corpo = `<div class="abas" style="margin-bottom:10px"><button type="button" data-modo="sacos" class="ativo">Só etiquetas (sacos)</button><button type="button" data-modo="dividir">Dividir o lote e registrar</button></div>
+    <p class="peq muted" id="ajuda"></p>
+    <div class="tabela-wrap"><table><thead><tr><th>Tamanho</th><th class="n">Peças</th><th class="n">Volumes</th><th class="col-div">Peças em cada volume</th></tr></thead><tbody>
+    ${tams.map(t => `<tr data-t="${t.id}"><td class="forte">${h(t.nome)}</td><td class="n">${num(pecas(t.id))}</td>
+      <td class="n"><input class="inp num" type="number" min="0" step="1" data-n value="${reg(t.id).length || ''}"></td>
+      <td class="col-div"><input class="inp" data-q value="${h(reg(t.id).join(' + '))}" placeholder="ex.: 200 + 200 + 200"></td></tr>`).join('')}
+    </tbody></table></div>`;
+  modal({ titulo: `Etiqueta de volume · lote ${c.lote}`, corpo, largo: true,
+    aoAbrir: (m) => {
+      let modo = vols.length ? 'dividir' : 'sacos';
+      const aplicar = () => {
+        m.querySelectorAll('[data-modo]').forEach(b => b.classList.toggle('ativo', b.dataset.modo === modo));
+        m.querySelectorAll('.col-div').forEach(x => x.style.display = modo === 'dividir' ? '' : 'none');
+        m.querySelector('#ajuda').innerHTML = modo === 'dividir'
+          ? 'O tamanho é dividido em volumes com quantidade definida (ex.: 600 P → 200 + 200 + 200). A divisão fica registrada no lote e a quantidade sai na etiqueta.'
+          : 'Só imprime as etiquetas: o lote continua o mesmo, as peças apenas foram em sacos diferentes (ex.: frente e costas). Deixe em branco o tamanho que não quer imprimir.';
+      };
+      m.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { modo = b.dataset.modo; aplicar(); });
+      m.querySelectorAll('[data-n]').forEach(i => i.oninput = () => {
+        const tr = i.closest('tr'), n = Math.floor(+i.value || 0), tot = pecas(+tr.dataset.t);
+        if (n > 0) { const base = Math.floor(tot / n), resto = tot - base * n; tr.querySelector('[data-q]').value = Array.from({ length: n }, (_, k) => base + (k < resto ? 1 : 0)).join(' + '); }
+      });
+      m.dataset.modo = modo; m._modo = () => modo; aplicar();
+    },
+    botoes: [{ texto: 'Cancelar' }, { texto: 'Imprimir', classe: 'pri', acao: async (m) => {
+      const modo = m._modo(); const imprimir = [];
+      for (const tr of m.querySelectorAll('tbody tr')) {
+        const t = +tr.dataset.t, n = Math.floor(+tr.querySelector('[data-n]').value || 0);
+        if (modo === 'sacos') { if (n > 0) imprimir.push({ t, n, qtds: null }); continue; }
+        const txt = tr.querySelector('[data-q]').value.trim();
+        if (!txt) continue;
+        const qtds = txt.split(/[+;,\s]+/).filter(Boolean).map(Number);
+        if (qtds.some(q => !(q > 0) || q % 1)) { toast('Use só números inteiros separados por +.', 'erro'); return false; }
+        const soma = qtds.reduce((a, q) => a + q, 0);
+        if (soma !== pecas(t)) { toast(`Tamanho ${tams.find(x => x.id === t).nome}: a soma (${soma}) tem que dar ${pecas(t)} peças.`, 'erro'); return false; }
+        if (!await chamar(db, 'registrar_volumes', { p_corte_id: c.id, p_tamanho_id: t, p_qtds: qtds })) return false;
+        imprimir.push({ t, n: qtds.length, qtds });
+      }
+      if (!imprimir.length) { toast('Informe os volumes de pelo menos um tamanho.', 'erro'); return false; }
+      const qr = (txt) => { if (!window.qrcode) return ''; const q = window.qrcode(0, 'M'); q.addData(String(txt)); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
+      imprimirHtml(imprimir.flatMap(({ t, n, qtds }) => { const tm = tams.find(x => x.id === t); return Array.from({ length: n }, (_, k) => `<div class="vol"><table>
+        <tr><th class="v-rot">MODELO:</th><td class="v-cod">${h(prod.cod)}</td><td class="v-qr" rowspan="2">${qr(c.lote + tm.nome)}</td></tr>
+        <tr><td colspan="2" class="v-nome">${h(prod.nome_base)}</td></tr>
+        <tr><td colspan="2" class="v-data"><span>DATA:</span> ${data(c.data)}</td><td rowspan="2" class="v-tam"><small>TAMANHO</small>${h(tm.nome)}</td></tr>
+        <tr><th colspan="2" class="v-rot" style="text-align:left">LOTE:</th></tr>
+        <tr><td colspan="3" class="v-lote">${h(c.lote)}</td></tr>
+        <tr><td colspan="3" class="v-vol">VOLUME: <b>${k + 1}/${n}</b>${qtds ? ` · <b>${qtds[k]}</b> peças` : ''}</td></tr>
+        <tr><td colspan="3" class="v-cores">${h(cores(t).join(' · '))}</td></tr></table></div>`); }).join(''));
+    } }] });
 }

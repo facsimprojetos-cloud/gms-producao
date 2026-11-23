@@ -56,7 +56,7 @@ async function cadastrarSku(sku, aoSalvar) {
   const v = await formModal({ titulo: 'Cadastrar SKU do Upseller', largo: true, botao: 'Cadastrar',
     texto: `<p class="peq muted">SKU <b>${h(sku)}</b>. Confira a sugestão. Para kit, informe o nome do kit e as cores; cada cor precisa ter o SKU físico (produto-cor-tamanho) cadastrado.</p>`,
     campos: [
-      { k: 'codigo_produto', r: 'Produto', tipo: 'select', req: true, valor: prod ? prod.codigo : '', opcoes: cad.produtos.filter(p => p.codigo).map(p => [p.codigo, `${p.codigo} - ${p.nome}`]) },
+      { k: 'codigo_produto', r: 'Produto', tipo: 'select', req: true, valor: prod ? prod.codigo : '', opcoes: cad.produtos.filter(p => p.codigo).map(p => [p.codigo, p.nome]) },
       { k: 'tamanho', r: 'Tamanho', tipo: 'select', req: true, valor: tamOk, opcoes: cad.tamanhos.map(t => [t.nome, t.nome]) },
       { k: 'cor', r: 'Cor', tipo: 'select', req: true, valor: achaCor(coresSku[0]), opcoes: opsCor },
       { k: 'cor2', r: 'Cor 2 / Estampa', tipo: 'select', vazio: '—', valor: achaCor(coresSku[1]), opcoes: opsCor },
@@ -65,7 +65,7 @@ async function cadastrarSku(sku, aoSalvar) {
     ] });
   if (!v) return;
   const p = cad.produtos.find(x => x.codigo === v.codigo_produto);
-  return aoSalvar({ ...v, sku, produto: p ? p.nome : '' });
+  return aoSalvar({ ...v, sku, produto: p ? p.nome_base : '' });
 }
 
 export async function render(el) {

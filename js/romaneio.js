@@ -38,7 +38,7 @@ export async function imprimirFolhaFaccao(remessaId) {
   const prodIds = [...new Set(itens.map(e => e.produto_id))];
   const [prods, ficha] = await Promise.all([
     ler(db.from('produtos').select('id,codigo,nome').in('id', prodIds)),
-    ler(db.from('ficha_tecnica').select('produto_id,consumo,sequencia,materias_primas(nome)').in('produto_id', prodIds).order('sequencia')),
+    ler(db.from('ficha_tecnica').select('produto_id,consumo,sequencia,materias_primas(nome,tipo)').in('produto_id', prodIds).order('sequencia')),
   ]);
   const cod = (p) => p && p.codigo ? String(Number(p.codigo) || p.codigo) : '';
   const lotes = new Map();
@@ -50,7 +50,7 @@ export async function imprimirFolhaFaccao(remessaId) {
     const q = (c, t) => es.filter(e => e.cor === c && e.tamanho === t).reduce((a, e) => a + Number(e.qtd), 0);
     const totCor = (c) => tams.reduce((a, t) => a + q(c, t), 0);
     const total = cores.reduce((a, c) => a + totCor(c), 0);
-    const avs = ficha.filter(f => f.produto_id === es[0].produto_id);
+    const avs = ficha.filter(f => f.produto_id === es[0].produto_id && f.materias_primas?.tipo !== 'TECIDO'); // tecido sai do estoque no corte, não vai na folha
     const av = (c, f) => Math.ceil(Number(f.consumo) * totCor(c) - 1e-9);
     const via = (nome) => `<div class="folha">
       <table class="f-cab">

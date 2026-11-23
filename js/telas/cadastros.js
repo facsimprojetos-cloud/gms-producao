@@ -2,15 +2,12 @@ import { db, tem } from '../app.js';
 import { h, moeda, chip, modal, ler, toast, msgErro, limparCache, formDados, confirmar } from '../util.js';
 
 const TABELAS = {
-  produtos: { nome: 'Produtos', ordem: 'nome', campos: [
+  produtos: { nome: 'Produtos', ordem: 'codigo', campos: [
     { k: 'nome', r: 'Produto', req: true }, { k: 'codigo', r: 'Código' },
     { k: 'valor_faccao', r: 'Valor pago à facção por peça (R$)', tipo: 'number' }, { k: 'preco', r: 'Preço de venda (R$)', tipo: 'number' },
-    { k: 'estamparia_apos', r: 'Vai para estamparia depois da produção', tipo: 'bool' }, { k: 'foto_url', r: 'Link da foto' }, { k: 'obs', r: 'Observação' },
-  ], colunas: (x) => [h(x.codigo || ''), h(x.nome), x.valor_faccao != null ? moeda(x.valor_faccao) : '—', x.preco != null ? moeda(x.preco) : '—', x.estamparia_apos ? chip('Estampa após', 'acento') : ''],
-    cab: ['Código', 'Produto', 'R$ facção', 'Preço', ''] },
-  clientes: { nome: 'Clientes', ordem: 'nome', perfil: 'comercial', campos: [
-    { k: 'nome', r: 'Cliente', req: true }, { k: 'telefone', r: 'Telefone' }, { k: 'documento', r: 'CPF/CNPJ' }, { k: 'obs', r: 'Observação' },
-  ], colunas: (x) => [h(x.nome), h(x.telefone || ''), h(x.documento || '')], cab: ['Cliente', 'Telefone', 'Documento'] },
+    { k: 'obs', r: 'Observação' },
+  ], colunas: (x) => [h(x.codigo || ''), h(x.nome), x.valor_faccao != null ? moeda(x.valor_faccao) : '—', x.preco != null ? moeda(x.preco) : '—'],
+    cab: ['Código', 'Produto', 'R$ facção (sugestão no fechamento)', 'Preço'] },
   faccoes: { nome: 'Facções', ordem: 'nome', campos: [
     { k: 'nome', r: 'Nome', req: true }, { k: 'numero', r: 'Nº', tipo: 'number' }, { k: 'telefone', r: 'Telefone' }, { k: 'endereco', r: 'Endereço' },
     { k: 'maquinas', r: 'Máquinas' }, { k: 'pix', r: 'PIX / dados bancários' }, { k: 'capacidade', r: 'Capacidade (peças)', tipo: 'number' },
@@ -19,16 +16,16 @@ const TABELAS = {
   cores: { nome: 'Cores', ordem: 'nome', campos: [{ k: 'nome', r: 'Cor', req: true }], colunas: (x) => [h(x.nome)], cab: ['Cor'] },
   tamanhos: { nome: 'Tamanhos', ordem: 'ordem', campos: [{ k: 'nome', r: 'Tamanho', req: true }, { k: 'ordem', r: 'Ordem de exibição', tipo: 'number' }],
     colunas: (x) => [h(x.nome), x.ordem], cab: ['Tamanho', 'Ordem'] },
-  operadores: { nome: 'Operadores', ordem: 'nome', campos: [{ k: 'nome', r: 'Nome', req: true }, { k: 'foto_url', r: 'Link da foto' }],
+  operadores: { nome: 'Operadores internos', ordem: 'nome', campos: [{ k: 'nome', r: 'Nome', req: true }, { k: 'foto_url', r: 'Link da foto' }],
     colunas: (x) => [h(x.nome)], cab: ['Nome'] },
   processos: { nome: 'Operações', ordem: 'nome', campos: [{ k: 'nome', r: 'Operação', req: true }], colunas: (x) => [h(x.nome)], cab: ['Operação'] },
   motivos_parada: { nome: 'Motivos de parada', ordem: 'nome', campos: [{ k: 'nome', r: 'Motivo', req: true }, { k: 'duracao_min', r: 'Duração prevista (min)', tipo: 'number' },
     { k: 'produtiva', r: 'Conta como tempo produtivo', tipo: 'bool' }], colunas: (x) => [h(x.nome), x.duracao_min ?? '—', x.produtiva ? 'Sim' : 'Não'], cab: ['Motivo', 'Duração (min)', 'Produtiva'] },
   materias_primas: { nome: 'Matéria-prima', ordem: 'nome', campos: [
-    { k: 'nome', r: 'Matéria-prima', req: true }, { k: 'tipo', r: 'Tipo', tipo: 'select', opcoes: ['TECIDO', 'AVIAMENTO', 'ACESSÓRIO', 'EMBALAGEM', 'OUTRO'] },
-    { k: 'unidade', r: 'Unidade', tipo: 'select', opcoes: ['KG', 'METRO', 'UNIDADE', 'ROLO', 'PACOTE', 'CONE'] }, { k: 'valor', r: 'Valor por unidade (R$)', tipo: 'number' },
+    { k: 'nome', r: 'Matéria-prima', req: true }, { k: 'tipo', r: 'Categoria (tecido sai no corte; as demais na folha de aviamentos)', tipo: 'select', opcoes: ['TECIDO', 'AVIAMENTO', 'ACESSÓRIO', 'EMBALAGEM', 'ALMOXARIFADO', 'OUTRO'] },
+    { k: 'unidade', r: 'Unidade', tipo: 'select', opcoes: ['KG', 'METRO', 'UNIDADE', 'ROLO', 'PACOTE', 'CONE', 'PAR'] }, { k: 'valor', r: 'Valor por unidade (R$)', tipo: 'number' },
     { k: 'rendimento', r: 'Rendimento', tipo: 'number' }, { k: 'largura', r: 'Largura (m)', tipo: 'number' }, { k: 'gramatura', r: 'Gramatura', tipo: 'number' }, { k: 'fornecedor', r: 'Fornecedor' },
-  ], colunas: (x) => [h(x.nome), h(x.tipo), h(x.unidade), moeda(x.valor), h(x.fornecedor || '')], cab: ['Matéria-prima', 'Tipo', 'Unid.', 'Valor', 'Fornecedor'] },
+  ], colunas: (x) => [h(x.nome), h(x.tipo), h(x.unidade), moeda(x.valor), h(x.fornecedor || '')], cab: ['Matéria-prima', 'Categoria', 'Unid.', 'Valor', 'Fornecedor'] },
 };
 let aba = 'produtos';
 const t_perfil = (a) => TABELAS[a].perfil;

@@ -180,10 +180,30 @@ tr.grupo td{background:#f3f4f6;font-weight:800}
 .folha .f-conf th,.folha .f-conf td{background:#a4c2f4;height:6mm}
 .folha .f-aviso{font-style:italic}
 .folha .f-assin th{width:15%;font-size:13pt}.folha .f-assin td{height:9mm}
-/* GMS: etiqueta de volume (modelo ETIQUETA_CORTE) */
-.vol{width:100mm;height:150mm;padding:5mm;box-sizing:border-box;page-break-after:always;break-after:page;font-family:Georgia,serif;color:#000;page:etiqueta}
-.vol table{width:100%;height:100%;border-collapse:collapse}
-.vol th,.vol td{border:2px solid #000;text-align:center}
-.vol th{font-size:15pt;width:36%}
-.vol td{font-size:20pt;font-weight:800}
-.vol .v-lote th{font-size:22pt}.vol .v-qr{width:26mm}.vol .v-qr svg{width:24mm;height:24mm;display:block;margin:auto}
+/* GMS: etiqueta de volume (modelo da GMS, 10 × 7 cm) */
+@page volume{size:100mm 70mm;margin:0}
+.vol{width:100mm;height:70mm;padding:2.5mm;box-sizing:border-box;page-break-after:always;break-after:page;font-family:Arial,sans-serif;color:#000;page:volume}
+.vol table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}
+.vol th,.vol td{border:1.5px solid #000;text-align:center;padding:0 1mm;line-height:1.05}
+.vol .v-rot{font-size:15pt;font-weight:900;width:38%}
+.vol .v-cod{font-size:20pt;font-weight:900}
+.vol .v-qr{width:22%;padding:1mm}.vol .v-qr svg{width:15mm;height:15mm;display:block;margin:auto}
+.vol .v-nome{font-size:9.5pt;font-weight:800}
+.vol .v-data{font-size:10pt;font-weight:700;text-align:left}.vol .v-data span{font-size:8pt}
+.vol .v-tam{font-size:26pt;font-weight:900}.vol .v-tam small{display:block;font-size:8pt;font-weight:800}
+.vol .v-lote{font-size:24pt;font-weight:900}
+.vol .v-vol{font-size:12pt}
+.vol .v-cores{font-size:7.5pt;font-weight:700}
+/* Listas com busca (js/busca.js) */
+.cbx{position:relative;display:block}
+.cbx-sel{position:absolute!important;left:0;bottom:0;width:100%!important;height:1px!important;min-height:0!important;opacity:0;pointer-events:none;padding:0!important;border:0!important;margin:0!important}
+.cbx-in{width:100%;margin-top:4px;padding:9px 30px 9px 11px;border:1px solid #d1d5db;border-radius:9px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='3'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;min-height:42px;font:inherit}
+.cbx-in:focus{outline:2px solid var(--acento-2);border-color:var(--acento)}
+.cbx-lista{position:absolute;z-index:300;left:0;right:0;top:calc(100% + 2px);max-height:280px;overflow:auto;background:#fff;border:1px solid #d1d5db;border-radius:9px;box-shadow:0 10px 24px rgba(0,0,0,.15);font-weight:500}
+.cbx-op{padding:8px 11px;cursor:pointer;color:var(--texto)}
+.cbx-op:hover,.cbx-op.ativo{background:var(--acento-2)}
+.cbx-vazio{color:var(--sub);font-style:italic}
+.cbx-nada{padding:8px 11px;color:var(--sub)}
+.barra{position:relative;height:22px;background:#e5e7eb;border-radius:11px;overflow:hidden;margin:10px 0 4px}
+.barra>div{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#16a34a,#22c55e)}
+.barra>span{position:relative;display:block;text-align:center;font-size:.78rem;font-weight:800;line-height:22px;color:#111827}
