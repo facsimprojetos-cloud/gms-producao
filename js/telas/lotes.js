@@ -137,13 +137,20 @@ async function telaEnvio(itens, depois, facPadrao = null) {
 }
 
 async function renderRemessas(el) {
+  const cad = await cadastros(db);
   const rems = await ler(db.from('v_remessas').select('*').order('data', { ascending: false }).limit(200));
+  const envs = rems.length ? await ler(db.from('v_envios').select('remessa_id,lote,produto_id').in('remessa_id', rems.map(r => r.id))) : [];
   const pode = tem('faccao');
-  const lista = rems.filter(r => contem(r, ['numero', 'faccao', 'obs'], busca));
+  rems.forEach(r => {
+    const es = envs.filter(e => e.remessa_id === r.id);
+    r.lotes = [...new Set(es.map(e => String(e.lote || '').replace(/\.\d+$/, '') || '(sem número)'))].join(', ');
+    r.produtos = [...new Set(es.map(e => cad.produtos.find(p => p.id === e.produto_id)?.nome || ''))].join(', ');
+  });
+  const lista = rems.filter(r => contem(r, ['lotes', 'produtos', 'faccao', 'obs'], busca));
   el.innerHTML = `${cab(pode)}
-    <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Nº, facção…"></label></div>
-    <div class="tabela-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Facção</th><th class="n">Itens</th><th class="n">Peças</th><th>Previsão</th><th></th></tr></thead>
-    <tbody>${lista.map(r => `<tr><td class="forte">${r.numero}</td><td>${dataHora(r.data)}</td><td>${h(r.faccao)}</td><td class="n">${r.itens}</td><td class="n">${num(r.qtd_total)}</td><td>${data(r.previsao)}</td>
+    <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Lote, produto, facção…"></label></div>
+    <div class="tabela-wrap"><table><thead><tr><th>Lote</th><th>Produto</th><th>Facção</th><th>Data de envio</th><th class="n">Peças</th><th>Previsão</th><th></th></tr></thead>
+    <tbody>${lista.map(r => `<tr><td class="forte">${h(r.lotes)}</td><td>${h(r.produtos)}</td><td>${h(r.faccao)}</td><td>${data(r.data)}</td><td class="n">${num(r.qtd_total)}</td><td>${data(r.previsao)}</td>
       <td><div class="acoes"><button class="btn peq pri" data-folha="${r.id}">🖨 Folha da facção</button>${pode ? `<button class="btn peq" data-ed="${r.id}">Editar</button>` : ''}</div></td></tr>`).join('')
       || '<tr><td colspan="7" class="vazio">Nenhum romaneio.</td></tr>'}</tbody></table></div>`;
   ligarAbas(el);
@@ -151,7 +158,7 @@ async function renderRemessas(el) {
   el.querySelectorAll('[data-folha]').forEach(b => b.onclick = () => imprimirFolhaFaccao(b.dataset.folha));
   el.querySelectorAll('[data-ed]').forEach(b => b.onclick = async () => {
     const r = rems.find(x => x.id === b.dataset.ed);
-    const v = await formModal({ titulo: `Romaneio ${r.numero} — ${r.faccao}`, campos: [
+    const v = await formModal({ titulo: `Romaneio do lote ${r.lotes} — ${r.faccao}`, campos: [
       { k: 'previsao', r: 'Previsão de retorno', tipo: 'date', valor: r.previsao },
       { k: 'obs', r: 'Observação', valor: r.obs }] });
     if (!v) return;
