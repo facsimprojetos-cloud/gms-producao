@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, SCHEMA, EMPRESA } from './config.js';
 // Versão publicada: muda a cada atualização para o navegador não usar telas antigas do cache
-const VERSAO = '202611231130'; // atualizar a cada publicação
+const VERSAO = '202611231145'; // atualizar a cada publicação
 import { h, toast } from './util.js';
 
 export const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -188,7 +188,10 @@ async function iniciarSessao() {
       <button class="btn" onclick="location.reload()">Tentar novamente</button></div></div>`;
     return;
   }
-  if (!status.usuario || !status.usuario.ativo) return telaSemAcesso(status, session.user.email);
+  if (!status.usuario || !status.usuario.ativo) {
+    if (!status.usuario) await db.rpc('pedir_acesso'); // entra na lista de contas pendentes só da GMS
+    return telaSemAcesso(status, session.user.email);
+  }
   ctx.usuario = session.user; ctx.email = session.user.email;
   ctx.nome = status.usuario.nome; ctx.perfis = status.usuario.perfis || [];
   montarLayout();
