@@ -1,11 +1,12 @@
 import { db, tem } from '../app.js';
 import { PREVISAO_DIAS } from '../config.js';
-import { h, num, moeda, data, dataHora, chip, modal, chamar, ler, cadastros, opcoes, toast, token, hojeISO, confirmar, contem, formModal } from '../util.js';
+import { h, num, moeda, data, dataHora, chip, modal, chamar, ler, cadastros, opcoes, toast, token, hojeISO, confirmar, contem, formModal, pedirTexto } from '../util.js';
 import { imprimirRomaneio, imprimirFolhaFaccao } from '../romaneio.js';
 
 let aba = 'separar';
 let busca = '';
 const selecionados = new Map(); // sublote_id -> qtd
+const abertos = new Set();      // cortes com as variações abertas
 
 export async function render(el) {
   if (aba === 'remessas') return renderRemessas(el);
@@ -16,42 +17,59 @@ export async function render(el) {
   const pode = tem('faccao');
   const filtrada = lista.filter(s => contem(s, ['codigo', 'lote', 'produto', 'cor', 'tamanho', 'faccao_corte'], busca));
   for (const id of selecionados.keys()) if (!lista.some(s => s.id === id)) selecionados.delete(id);
-  const grupos = new Map();
-  filtrada.forEach(s => { if (!grupos.has(s.lote)) grupos.set(s.lote, []); grupos.get(s.lote).push(s); });
+  const grupos = new Map(); // por corte: o lote fica fechado numa linha; "Ver variações" abre cor × tamanho
+  filtrada.forEach(s => { if (!grupos.has(s.corte_id)) grupos.set(s.corte_id, []); grupos.get(s.corte_id).push(s); });
+  const sup = tem('supervisor');
   const ncol = pode ? 8 : 6;
+  const estado = (itens) => { const n = itens.filter(s => selecionados.has(s.id)).length; return n === 0 ? '' : n === itens.length ? 'checked' : 'data-meio'; };
 
   el.innerHTML = `
     ${cab(pode)}
     <div class="filtros"><label class="campo">Buscar<input id="busca" value="${h(busca)}" placeholder="Lote, produto, cor, facção…"></label></div>
+    <p class="muted peq">${num(grupos.size)} lote(s) · ${num(filtrada.reduce((a, s) => a + s.qtd_saldo, 0))} peças. Marque o lote inteiro ou abra as variações para escolher cor × tamanho.</p>
     <div class="tabela-wrap"><table>
       <thead><tr>${pode ? '<th></th>' : ''}<th>Sublote</th><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Cortado</th><th class="n">A distribuir</th>${pode ? '<th class="n">Enviar</th>' : ''}</tr></thead>
-      <tbody>${[...grupos.entries()].map(([lote, itens]) => `
-        <tr class="grupo"><td colspan="${ncol}">Lote ${h(lote)} · ${h(itens[0].produto)} · ${num(itens.reduce((a, s) => a + s.qtd_saldo, 0))} peças${itens[0].faccao_corte ? ` · <b>${h(itens[0].faccao_corte)}</b>` : ''}
-          ${pode ? `<button class="btn peq" data-tudo="${h(lote)}" style="margin-left:8px">Selecionar lote</button>` : ''}</td></tr>
-        ${itens.map(s => `<tr>
+      <tbody>${[...grupos.entries()].map(([cid, itens]) => {
+        const x = itens[0], aberto = abertos.has(cid);
+        const cores = [...new Set(itens.map(s => s.cor))], tams = [...new Set(itens.map(s => s.tamanho))];
+        return `
+        <tr class="grupo lote-linha">${pode ? `<td><input type="checkbox" data-lote="${cid}" ${estado(itens)}></td>` : ''}
+          <td colspan="${ncol - (pode ? 2 : 1)}"><button class="btn peq" data-abrir="${cid}">${aberto ? '▾' : '▸'} ${aberto ? 'Fechar' : 'Ver variações'}</button>
+            <b style="margin-left:8px">Lote ${h(x.lote || '(sem número)')}</b> · ${h(x.produto)}${x.faccao_corte ? ` · <b>${h(x.faccao_corte)}</b>` : ''}
+            <span class="muted peq"> · ${cores.length} cor(es) · ${h(tams.join(' '))}</span>
+            ${sup ? `<button class="btn peq perigo" data-apagar="${cid}" style="margin-left:8px">🗑 Apagar lote</button>` : ''}</td>
+          <td class="n forte">${num(itens.reduce((a, s) => a + s.qtd_saldo, 0))}</td></tr>
+        ${aberto ? itens.map(s => `<tr>
           ${pode ? `<td><input type="checkbox" data-sel="${s.id}" ${selecionados.has(s.id) ? 'checked' : ''}></td>` : ''}
           <td class="forte">${h(s.codigo)}</td><td>${h(s.produto)}</td><td>${h(s.cor)}</td><td>${h(s.tamanho)}</td>
           <td class="n">${num(s.qtd_cortada)}</td><td class="n forte">${num(s.qtd_saldo)}</td>
           ${pode ? `<td class="n"><input class="inp num" type="number" min="1" max="${s.qtd_saldo}" data-qtd="${s.id}" value="${selecionados.get(s.id) ?? s.qtd_saldo}"></td>` : ''}
-        </tr>`).join('')}`).join('') || `<tr><td colspan="${ncol}" class="vazio">${aba === 'envio' ? 'Nenhum lote aguardando envio.' : 'Nenhum lote aguardando distribuição.'}</td></tr>`}
+        </tr>`).join('') : ''}`; }).join('') || `<tr><td colspan="${ncol}" class="vazio">${aba === 'envio' ? 'Nenhum lote aguardando envio.' : 'Nenhum lote aguardando distribuição.'}</td></tr>`}
       </tbody></table></div>`;
 
   ligarAbas(el);
   el.querySelector('#busca').onchange = (e) => { busca = e.target.value; render(el); };
+  el.querySelectorAll('[data-meio]').forEach(cb => { cb.indeterminate = true; });
   const btn = el.querySelector('#enviar');
   const atualizar = () => { if (btn) { btn.disabled = !selecionados.size; btn.textContent = `Enviar para facção (${selecionados.size})`; } };
+  el.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => { const id = b.dataset.abrir; abertos.has(id) ? abertos.delete(id) : abertos.add(id); render(el); });
   el.querySelectorAll('[data-sel]').forEach(cb => cb.onchange = () => {
     const id = cb.dataset.sel, qi = el.querySelector(`[data-qtd="${id}"]`);
     if (cb.checked) selecionados.set(id, +qi.value); else selecionados.delete(id);
-    atualizar();
-  });
-  el.querySelectorAll('[data-tudo]').forEach(b => b.onclick = () => {
-    const todos = filtrada.filter(s => s.lote === b.dataset.tudo);
-    const marcar = !todos.every(s => selecionados.has(s.id));
-    todos.forEach(s => marcar ? selecionados.set(s.id, s.qtd_saldo) : selecionados.delete(s.id));
     render(el);
   });
+  el.querySelectorAll('[data-lote]').forEach(cb => cb.onchange = () => {
+    const itens = grupos.get(cb.dataset.lote);
+    itens.forEach(s => cb.checked ? selecionados.set(s.id, selecionados.get(s.id) ?? s.qtd_saldo) : selecionados.delete(s.id));
+    render(el);
+  });
+  el.querySelectorAll('[data-apagar]').forEach(b => b.onclick = async () => {
+    const itens = grupos.get(b.dataset.apagar), x = itens[0];
+    const m = await pedirTexto(`Apagar lote ${x.lote || '(sem número)'}`, `O corte deste lote (${h(x.produto)}, ${num(itens.reduce((a, s) => a + s.qtd_cortada, 0))} peças) e todos os sublotes serão apagados. Só é possível se nada foi enviado.`, { botao: 'Apagar lote' });
+    if (m && await chamar(db, 'apagar_lote', { p_corte_id: b.dataset.apagar, p_motivo: m })) { itens.forEach(s => selecionados.delete(s.id)); toast('Lote apagado.', 'ok'); render(el); }
+  });
   el.querySelectorAll('[data-qtd]').forEach(i => i.oninput = () => { if (selecionados.has(i.dataset.qtd)) selecionados.set(i.dataset.qtd, +i.value); });
+  atualizar();
   btn?.addEventListener('click', () => {
     const itens = lista.filter(s => selecionados.has(s.id));
     const facs = [...new Set(itens.map(s => s.faccao_corte_id).filter(Boolean))];
