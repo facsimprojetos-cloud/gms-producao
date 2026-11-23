@@ -1,8 +1,8 @@
-# MALI — Gestão de Produção
+# GMS — Gestão de Produção
 
-App web (HTML + JavaScript puro) publicado no GitHub Pages em **https://mali.gutgestao.com.br**, com banco no Supabase (projeto **PROJETOS**, schema **`mali`**).
+App web (HTML + JavaScript puro) publicado no GitHub Pages em **https://gms.gutgestao.com.br**, com banco no Supabase (projeto **PROJETOS**, schema **`gms`**).
 
-Substitui o app AppSheet **APP MALI** (planilha `1LN6dKyb_jVp9yAzHZdnE5kHYUUeOil1EK-EcahBTZXs`).
+Substitui as planilhas **GMS CONTROLE DE PRODUÇÃO**, **APONTADOR GMS**, **SKU GMS** e **ETIQUETA GMS** (AppSheet + Apps Script).
 
 ## Fluxo
 
@@ -44,13 +44,13 @@ Fechamento: paga à facção (peças boas × valor por peça) + consertos recebi
 ## Estrutura
 ```
 index.html, css/app.css, js/app.js (login, menu, rotas), js/util.js, js/romaneio.js, js/telas/*.js (uma tela por arquivo)
-supabase/migrations/   estrutura, regras de negócio (funções mali.*), views v_*, RLS
+supabase/migrations/   estrutura, regras de negócio (funções gms.*), views v_*, RLS
 supabase/seed_cadastros.sql   cadastros reais importados da planilha (tools/importar_cadastros.py)
 test/rodar.sh          teste do fluxo completo num Postgres 16 local
 CNAME                  domínio do GitHub Pages
 ```
 
-As regras de negócio ficam no banco (funções `mali.*`, `security definer` com checagem de perfil); o front só chama essas funções e lê as views `v_*` (com `security_invoker`, respeitando o RLS).
+As regras de negócio ficam no banco (funções `gms.*`, `security definer` com checagem de perfil); o front só chama essas funções e lê as views `v_*` (com `security_invoker`, respeitando o RLS).
 
 ## Publicação
-Branch `main` publicada pelo GitHub Pages a partir da raiz. Domínio: registro **CNAME** `mali` → `facsimprojetos-cloud.github.io` no DNS de `gutgestao.com.br`.
+Branch `main` publicada pelo GitHub Pages a partir da raiz. Domínio: registro **CNAME** `gms` → `facsimprojetos-cloud.github.io` no DNS de `gutgestao.com.br`.
